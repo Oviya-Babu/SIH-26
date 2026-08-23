@@ -1,0 +1,126 @@
+{
+  "version": "1.0",
+  "description": "Emergency and critical pattern red-flag rules — conservative, high-sensitivity defaults",
+  "rules": [
+    {
+      "id": "rule-acs",
+      "name": "Possible Acute Coronary Syndrome Pattern",
+      "description": "Chest pain with features suggestive of acute coronary syndrome",
+      "version": "1.0",
+      "severity": "critical",
+      "conditions": [
+        { "field": "chief_complaint", "operator": "contains", "value": "chest_pain" },
+        { "field": "location", "operator": "in", "value": ["chest_left", "chest_center", "chest"] },
+        { "field": "character", "operator": "in", "value": ["crushing", "pressing"] }
+      ],
+      "logicOperator": "AND",
+      "escalationMessage": {
+        "en": "Please wait, a staff member will assist you shortly.",
+        "hi": "कृपया प्रतीक्षा करें, एक कर्मचारी जल्द ही आपकी सहायता करेगा।"
+      },
+      "staffMessage": "Patient presents with left/central chest pain of crushing/pressing character — pattern consistent with possible ACS. Requires immediate triage assessment.",
+      "slaMinutes": 3,
+      "category": "cardiac",
+      "active": true
+    },
+    {
+      "id": "rule-acs-radiation",
+      "name": "Chest Pain with Arm Radiation",
+      "description": "Chest pain radiating to arm — supplementary ACS indicator",
+      "version": "1.0",
+      "severity": "critical",
+      "conditions": [
+        { "field": "chief_complaint", "operator": "contains", "value": "chest_pain" },
+        { "field": "radiation", "operator": "contains", "value": "arm" }
+      ],
+      "logicOperator": "AND",
+      "escalationMessage": {
+        "en": "Please wait, a staff member will assist you shortly.",
+        "hi": "कृपया प्रतीक्षा करें, एक कर्मचारी जल्द ही आपकी सहायता करेगा।"
+      },
+      "staffMessage": "Patient reports chest pain radiating to arm — possible ACS pattern. Immediate triage assessment required.",
+      "slaMinutes": 3,
+      "category": "cardiac",
+      "active": true
+    },
+    {
+      "id": "rule-severe-dyspnoea",
+      "name": "Severe Respiratory Distress",
+      "description": "Severe shortness of breath as presenting complaint",
+      "version": "1.0",
+      "severity": "critical",
+      "conditions": [
+        { "field": "chief_complaint", "operator": "contains", "value": "dyspnoea" },
+        { "field": "severity", "operator": "gt", "value": 7 }
+      ],
+      "logicOperator": "AND",
+      "escalationMessage": {
+        "en": "Please wait, a staff member will assist you shortly.",
+        "hi": "कृपया प्रतीक्षा करें, एक कर्मचारी जल्द ही आपकी सहायता करेगा।"
+      },
+      "staffMessage": "Patient reports severe shortness of breath (severity >7/10). Requires immediate assessment.",
+      "slaMinutes": 3,
+      "category": "respiratory",
+      "active": true
+    },
+    {
+      "id": "rule-severe-pain",
+      "name": "Severe Pain Alert",
+      "description": "Any complaint with severity >= 8",
+      "version": "1.0",
+      "severity": "high",
+      "conditions": [
+        { "field": "severity", "operator": "gt", "value": 7 }
+      ],
+      "logicOperator": "AND",
+      "escalationMessage": {
+        "en": "We've noted your pain level. A staff member will check on you shortly.",
+        "hi": "हमने आपके दर्द के स्तर को नोट किया है। एक कर्मचारी जल्द ही आपसे मिलेंगे।"
+      },
+      "staffMessage": "Patient reports severe pain (severity >= 8/10). Please assess promptly.",
+      "slaMinutes": 5,
+      "category": "pain_management",
+      "active": true
+    },
+    {
+      "id": "rule-allergy-alert",
+      "name": "Known Drug Allergy with Active Medication",
+      "description": "Patient has both a documented allergy and active medications — potential interaction flag",
+      "version": "1.0",
+      "severity": "moderate",
+      "conditions": [
+        { "field": "allergies", "operator": "exists", "value": true },
+        { "field": "current_medications", "operator": "exists", "value": true }
+      ],
+      "logicOperator": "AND",
+      "escalationMessage": {
+        "en": "Thank you for sharing your allergy information. The doctor will review this carefully.",
+        "hi": "आपकी एलर्जी की जानकारी साझा करने के लिए धन्यवाद। डॉक्टर इसकी सावधानी से समीक्षा करेंगे।"
+      },
+      "staffMessage": "Patient has documented allergies AND is on active medications. Physician should verify no contraindicated medications are being taken.",
+      "slaMinutes": 15,
+      "category": "medication_safety",
+      "active": true
+    },
+    {
+      "id": "rule-chest-pain-dyspnoea",
+      "name": "Chest Pain with Dyspnoea",
+      "description": "Combination of chest pain and shortness of breath",
+      "version": "1.0",
+      "severity": "critical",
+      "conditions": [
+        { "field": "chief_complaint", "operator": "contains", "value": "chest_pain" },
+        { "field": "associated_symptoms", "operator": "contains", "value": "dyspnoea" }
+      ],
+      "logicOperator": "AND",
+      "escalationMessage": {
+        "en": "Please wait, a staff member will assist you shortly.",
+        "hi": "कृपया प्रतीक्षा करें, एक कर्मचारी जल्द ही आपकी सहायता करेगा।"
+      },
+      "staffMessage": "Patient reports chest pain with associated dyspnoea — multiple differential diagnoses possible including ACS, PE, pneumothorax. Urgent triage required.",
+      "slaMinutes": 3,
+      "category": "cardiac",
+      "active": true
+    }
+  ]
+}

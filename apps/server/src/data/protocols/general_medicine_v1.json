@@ -1,0 +1,433 @@
+{
+  "protocolId": "general_medicine_v1",
+  "name": "General Medicine Intake",
+  "version": "1.0",
+  "department": "General Medicine",
+  "specialty": "Internal Medicine",
+  "description": "Standard general medicine OPD intake protocol covering chief complaint, HPI, past medical/surgical history, medications, allergies, family history, personal history, and review of systems.",
+  "questionGroups": [
+    {
+      "id": "chief_complaint",
+      "label": { "en": "Chief Complaint", "hi": "मुख्य शिकायत" },
+      "order": 1,
+      "questions": [
+        {
+          "id": "q-cc",
+          "conceptCode": "chief_complaint",
+          "conceptLabel": "Chief Complaint",
+          "category": "chief_complaint",
+          "fieldName": "chief_complaint",
+          "dataType": "string",
+          "widgetType": "text_input",
+          "required": true,
+          "voicePrompt": {
+            "en": "What is the main problem or symptom that brought you here today?",
+            "hi": "आज आप यहाँ किस मुख्य समस्या या लक्षण के कारण आए हैं?"
+          },
+          "touchLabel": { "en": "Main problem", "hi": "मुख्य समस्या" },
+          "helpText": {
+            "en": "Describe your main health concern in your own words",
+            "hi": "अपनी मुख्य स्वास्थ्य चिंता अपने शब्दों में बताएं"
+          },
+          "confirmBack": true,
+          "group": "chief_complaint",
+          "order": 1
+        }
+      ]
+    },
+    {
+      "id": "hpi",
+      "label": { "en": "History of Present Illness", "hi": "वर्तमान बीमारी का इतिहास" },
+      "order": 2,
+      "questions": [
+        {
+          "id": "q-onset",
+          "conceptCode": "symptom_onset",
+          "conceptLabel": "Onset",
+          "category": "symptom",
+          "fieldName": "onset",
+          "dataType": "string",
+          "widgetType": "duration_picker",
+          "required": true,
+          "voicePrompt": {
+            "en": "When did this problem start?",
+            "hi": "यह समस्या कब शुरू हुई?"
+          },
+          "touchLabel": { "en": "When did it start?", "hi": "कब शुरू हुआ?" },
+          "confirmBack": false,
+          "group": "hpi",
+          "order": 1
+        },
+        {
+          "id": "q-location",
+          "conceptCode": "pain_location",
+          "conceptLabel": "Location",
+          "category": "symptom",
+          "fieldName": "location",
+          "dataType": "body_location",
+          "widgetType": "body_map",
+          "required": true,
+          "voicePrompt": {
+            "en": "Where exactly do you feel the pain or discomfort?",
+            "hi": "आपको दर्द या तकलीफ़ कहाँ महसूस हो रही है?"
+          },
+          "touchLabel": { "en": "Tap the area on the body", "hi": "शरीर पर वह जगह दबाएं" },
+          "confirmBack": true,
+          "group": "hpi",
+          "order": 2,
+          "dependsOn": [{ "field": "chief_complaint", "operator": "exists", "value": true }]
+        },
+        {
+          "id": "q-character",
+          "conceptCode": "pain_character",
+          "conceptLabel": "Character",
+          "category": "symptom",
+          "fieldName": "character",
+          "dataType": "multi_enum",
+          "widgetType": "multi_select",
+          "required": true,
+          "options": [
+            { "value": "sharp", "label": { "en": "Sharp / Stabbing", "hi": "तीखा / चुभन" } },
+            { "value": "dull", "label": { "en": "Dull / Aching", "hi": "हल्का दर्द" } },
+            { "value": "burning", "label": { "en": "Burning", "hi": "जलन" } },
+            { "value": "crushing", "label": { "en": "Crushing / Pressing", "hi": "दबाव / भारीपन" } },
+            { "value": "throbbing", "label": { "en": "Throbbing / Pulsating", "hi": "धड़कता हुआ" } },
+            { "value": "cramping", "label": { "en": "Cramping", "hi": "ऐंठन" } },
+            { "value": "tingling", "label": { "en": "Tingling / Pins and needles", "hi": "झुनझुनी" } },
+            { "value": "numbness", "label": { "en": "Numbness", "hi": "सुन्न" } }
+          ],
+          "voicePrompt": {
+            "en": "How would you describe the pain? Is it sharp, dull, burning, crushing, or something else?",
+            "hi": "दर्द कैसा है? तीखा, हल्का, जलन वाला, या दबाव वाला?"
+          },
+          "touchLabel": { "en": "Select pain type(s)", "hi": "दर्द का प्रकार चुनें" },
+          "confirmBack": false,
+          "group": "hpi",
+          "order": 3
+        },
+        {
+          "id": "q-severity",
+          "conceptCode": "pain_severity",
+          "conceptLabel": "Severity",
+          "category": "symptom",
+          "fieldName": "severity",
+          "dataType": "number",
+          "widgetType": "severity_slider",
+          "required": true,
+          "voicePrompt": {
+            "en": "On a scale of 1 to 10, where 1 is very mild and 10 is the worst pain you can imagine, how severe is your pain?",
+            "hi": "1 से 10 के पैमाने पर, जहाँ 1 बहुत हल्का और 10 सबसे तेज़ दर्द है, आपका दर्द कितना तेज़ है?"
+          },
+          "touchLabel": { "en": "Rate your pain", "hi": "दर्द की तीव्रता बताएं" },
+          "confirmBack": true,
+          "group": "hpi",
+          "order": 4
+        },
+        {
+          "id": "q-radiation",
+          "conceptCode": "pain_radiation",
+          "conceptLabel": "Radiation",
+          "category": "symptom",
+          "fieldName": "radiation",
+          "dataType": "string",
+          "widgetType": "body_map",
+          "required": false,
+          "voicePrompt": {
+            "en": "Does the pain spread or radiate to any other part of your body?",
+            "hi": "क्या दर्द शरीर के किसी और हिस्से में फैलता है?"
+          },
+          "touchLabel": { "en": "Does pain spread?", "hi": "क्या दर्द फैलता है?" },
+          "confirmBack": true,
+          "group": "hpi",
+          "order": 5
+        },
+        {
+          "id": "q-aggravating",
+          "conceptCode": "aggravating_factors",
+          "conceptLabel": "Aggravating Factors",
+          "category": "symptom",
+          "fieldName": "aggravating_factors",
+          "dataType": "multi_enum",
+          "widgetType": "multi_select",
+          "required": false,
+          "options": [
+            { "value": "exertion", "label": { "en": "Physical exertion", "hi": "शारीरिक मेहनत" } },
+            { "value": "eating", "label": { "en": "Eating", "hi": "खाना खाने पर" } },
+            { "value": "breathing", "label": { "en": "Deep breathing", "hi": "गहरी साँस लेने पर" } },
+            { "value": "movement", "label": { "en": "Movement", "hi": "हिलने-डुलने पर" } },
+            { "value": "stress", "label": { "en": "Stress / Anxiety", "hi": "तनाव / चिंता" } },
+            { "value": "lying_down", "label": { "en": "Lying down", "hi": "लेटने पर" } },
+            { "value": "cold", "label": { "en": "Cold weather", "hi": "ठंड में" } },
+            { "value": "nothing", "label": { "en": "Nothing specific", "hi": "कुछ विशेष नहीं" } }
+          ],
+          "voicePrompt": {
+            "en": "What makes the pain worse?",
+            "hi": "क्या करने से दर्द बढ़ता है?"
+          },
+          "touchLabel": { "en": "What makes it worse?", "hi": "क्या करने से बढ़ता है?" },
+          "confirmBack": false,
+          "group": "hpi",
+          "order": 6
+        },
+        {
+          "id": "q-relieving",
+          "conceptCode": "relieving_factors",
+          "conceptLabel": "Relieving Factors",
+          "category": "symptom",
+          "fieldName": "relieving_factors",
+          "dataType": "multi_enum",
+          "widgetType": "multi_select",
+          "required": false,
+          "options": [
+            { "value": "rest", "label": { "en": "Rest", "hi": "आराम करने पर" } },
+            { "value": "medication", "label": { "en": "Medication", "hi": "दवाई से" } },
+            { "value": "position_change", "label": { "en": "Changing position", "hi": "स्थिति बदलने पर" } },
+            { "value": "cold_application", "label": { "en": "Cold application", "hi": "ठंडा सेक" } },
+            { "value": "warm_application", "label": { "en": "Warm application", "hi": "गर्म सेक" } },
+            { "value": "nothing", "label": { "en": "Nothing helps", "hi": "कुछ भी राहत नहीं देता" } }
+          ],
+          "voicePrompt": {
+            "en": "What makes the pain better or gives you relief?",
+            "hi": "क्या करने से दर्द कम होता है या राहत मिलती है?"
+          },
+          "touchLabel": { "en": "What gives relief?", "hi": "क्या राहत देता है?" },
+          "confirmBack": false,
+          "group": "hpi",
+          "order": 7
+        },
+        {
+          "id": "q-associated",
+          "conceptCode": "associated_symptoms",
+          "conceptLabel": "Associated Symptoms",
+          "category": "symptom",
+          "fieldName": "associated_symptoms",
+          "dataType": "multi_enum",
+          "widgetType": "multi_select",
+          "required": true,
+          "options": [
+            { "value": "dyspnoea", "label": { "en": "Shortness of breath", "hi": "साँस लेने में तकलीफ़" } },
+            { "value": "diaphoresis", "label": { "en": "Sweating", "hi": "पसीना" } },
+            { "value": "nausea", "label": { "en": "Nausea / Vomiting", "hi": "जी मिचलाना / उल्टी" } },
+            { "value": "dizziness", "label": { "en": "Dizziness", "hi": "चक्कर आना" } },
+            { "value": "palpitations", "label": { "en": "Palpitations", "hi": "दिल की धड़कन तेज़" } },
+            { "value": "fever", "label": { "en": "Fever", "hi": "बुखार" } },
+            { "value": "cough", "label": { "en": "Cough", "hi": "खाँसी" } },
+            { "value": "fatigue", "label": { "en": "Fatigue / Weakness", "hi": "थकान / कमज़ोरी" } },
+            { "value": "none", "label": { "en": "None of the above", "hi": "इनमें से कोई नहीं" } }
+          ],
+          "voicePrompt": {
+            "en": "Do you have any other symptoms along with this? For example, shortness of breath, sweating, nausea, or dizziness?",
+            "hi": "क्या इसके साथ कोई और लक्षण हैं? जैसे साँस लेने में तकलीफ़, पसीना, जी मिचलाना, या चक्कर?"
+          },
+          "touchLabel": { "en": "Any other symptoms?", "hi": "और कोई लक्षण?" },
+          "confirmBack": false,
+          "group": "hpi",
+          "order": 8
+        }
+      ]
+    },
+    {
+      "id": "past_history",
+      "label": { "en": "Past Medical History", "hi": "पिछली बीमारियों का इतिहास" },
+      "order": 3,
+      "questions": [
+        {
+          "id": "q-pmh-dm",
+          "conceptCode": "diabetes_mellitus",
+          "conceptLabel": "Diabetes",
+          "category": "past_medical_history",
+          "fieldName": "diabetes_mellitus",
+          "dataType": "boolean",
+          "widgetType": "yes_no",
+          "required": true,
+          "voicePrompt": { "en": "Have you ever been told you have diabetes or sugar?", "hi": "क्या आपको कभी शुगर या मधुमेह बताया गया है?" },
+          "touchLabel": { "en": "Diabetes / Sugar?", "hi": "शुगर / मधुमेह?" },
+          "confirmBack": false,
+          "group": "past_history",
+          "order": 1
+        },
+        {
+          "id": "q-pmh-htn",
+          "conceptCode": "hypertension",
+          "conceptLabel": "Hypertension",
+          "category": "past_medical_history",
+          "fieldName": "hypertension",
+          "dataType": "boolean",
+          "widgetType": "yes_no",
+          "required": true,
+          "voicePrompt": { "en": "Have you ever been told you have high blood pressure?", "hi": "क्या आपको कभी हाई ब्लड प्रेशर बताया गया है?" },
+          "touchLabel": { "en": "High BP?", "hi": "हाई बीपी?" },
+          "confirmBack": false,
+          "group": "past_history",
+          "order": 2
+        },
+        {
+          "id": "q-pmh-heart",
+          "conceptCode": "heart_disease",
+          "conceptLabel": "Heart Disease",
+          "category": "past_medical_history",
+          "fieldName": "heart_disease",
+          "dataType": "boolean",
+          "widgetType": "yes_no",
+          "required": true,
+          "voicePrompt": { "en": "Do you have any known heart problems?", "hi": "क्या आपको दिल की कोई बीमारी है?" },
+          "touchLabel": { "en": "Heart problems?", "hi": "दिल की बीमारी?" },
+          "confirmBack": false,
+          "group": "past_history",
+          "order": 3
+        },
+        {
+          "id": "q-pmh-asthma",
+          "conceptCode": "asthma_copd",
+          "conceptLabel": "Asthma / COPD",
+          "category": "past_medical_history",
+          "fieldName": "asthma_copd",
+          "dataType": "boolean",
+          "widgetType": "yes_no",
+          "required": true,
+          "voicePrompt": { "en": "Do you have asthma or any chronic breathing problems?", "hi": "क्या आपको अस्थमा या साँस की पुरानी बीमारी है?" },
+          "touchLabel": { "en": "Asthma / Breathing?", "hi": "अस्थमा / साँस?" },
+          "confirmBack": false,
+          "group": "past_history",
+          "order": 4
+        },
+        {
+          "id": "q-pmh-surgery",
+          "conceptCode": "past_surgeries",
+          "conceptLabel": "Past Surgeries",
+          "category": "past_surgical_history",
+          "fieldName": "past_surgeries",
+          "dataType": "string",
+          "widgetType": "text_input",
+          "required": false,
+          "voicePrompt": { "en": "Have you had any surgeries in the past? If yes, please describe.", "hi": "क्या पहले कोई ऑपरेशन हुआ है? अगर हाँ, तो बताइए।" },
+          "touchLabel": { "en": "Any past surgeries?", "hi": "कोई पुराना ऑपरेशन?" },
+          "confirmBack": false,
+          "group": "past_history",
+          "order": 5
+        }
+      ]
+    },
+    {
+      "id": "medications",
+      "label": { "en": "Medications & Allergies", "hi": "दवाइयाँ और एलर्जी" },
+      "order": 4,
+      "questions": [
+        {
+          "id": "q-med-current",
+          "conceptCode": "current_medications",
+          "conceptLabel": "Current Medications",
+          "category": "medication",
+          "fieldName": "current_medications",
+          "dataType": "string",
+          "widgetType": "text_input",
+          "required": true,
+          "voicePrompt": { "en": "Are you currently taking any medications? Please tell me all the medicines you take regularly.", "hi": "क्या आप अभी कोई दवाई ले रहे हैं? कृपया सभी दवाइयाँ बताइए।" },
+          "touchLabel": { "en": "Current medicines?", "hi": "मौजूदा दवाइयाँ?" },
+          "confirmBack": true,
+          "group": "medications",
+          "order": 1
+        },
+        {
+          "id": "q-allergy",
+          "conceptCode": "allergies",
+          "conceptLabel": "Allergies",
+          "category": "allergy",
+          "fieldName": "allergies",
+          "dataType": "string",
+          "widgetType": "text_input",
+          "required": true,
+          "voicePrompt": { "en": "Do you have any allergies to medications, food, or anything else?", "hi": "क्या आपको किसी दवाई, खाने, या किसी और चीज़ से एलर्जी है?" },
+          "touchLabel": { "en": "Any allergies?", "hi": "कोई एलर्जी?" },
+          "confirmBack": true,
+          "group": "medications",
+          "order": 2
+        }
+      ]
+    },
+    {
+      "id": "family_history",
+      "label": { "en": "Family History", "hi": "पारिवारिक इतिहास" },
+      "order": 5,
+      "questions": [
+        {
+          "id": "q-fhx-heart",
+          "conceptCode": "family_heart_disease",
+          "conceptLabel": "Family Heart Disease",
+          "category": "family_history",
+          "fieldName": "family_heart_disease",
+          "dataType": "boolean",
+          "widgetType": "yes_no",
+          "required": false,
+          "voicePrompt": { "en": "Does anyone in your family — parents, siblings — have heart disease?", "hi": "क्या आपके परिवार में — माता-पिता, भाई-बहन — किसी को दिल की बीमारी है?" },
+          "touchLabel": { "en": "Family heart disease?", "hi": "परिवार में दिल की बीमारी?" },
+          "confirmBack": false,
+          "group": "family_history",
+          "order": 1
+        },
+        {
+          "id": "q-fhx-dm",
+          "conceptCode": "family_diabetes",
+          "conceptLabel": "Family Diabetes",
+          "category": "family_history",
+          "fieldName": "family_diabetes",
+          "dataType": "boolean",
+          "widgetType": "yes_no",
+          "required": false,
+          "voicePrompt": { "en": "Does anyone in your family have diabetes?", "hi": "क्या आपके परिवार में किसी को शुगर है?" },
+          "touchLabel": { "en": "Family diabetes?", "hi": "परिवार में शुगर?" },
+          "confirmBack": false,
+          "group": "family_history",
+          "order": 2
+        }
+      ]
+    },
+    {
+      "id": "personal_history",
+      "label": { "en": "Personal History", "hi": "व्यक्तिगत इतिहास" },
+      "order": 6,
+      "questions": [
+        {
+          "id": "q-smoking",
+          "conceptCode": "smoking_status",
+          "conceptLabel": "Smoking",
+          "category": "lifestyle",
+          "fieldName": "smoking",
+          "dataType": "enum",
+          "widgetType": "single_select",
+          "required": false,
+          "options": [
+            { "value": "never", "label": { "en": "Never smoked", "hi": "कभी नहीं" } },
+            { "value": "former", "label": { "en": "Former smoker", "hi": "पहले पीता था" } },
+            { "value": "current", "label": { "en": "Currently smoking", "hi": "अभी पीता हूँ" } }
+          ],
+          "voicePrompt": { "en": "Do you smoke or have you ever smoked?", "hi": "क्या आप धूम्रपान करते हैं या कभी किया है?" },
+          "touchLabel": { "en": "Smoking?", "hi": "धूम्रपान?" },
+          "confirmBack": false,
+          "group": "personal_history",
+          "order": 1
+        },
+        {
+          "id": "q-alcohol",
+          "conceptCode": "alcohol_use",
+          "conceptLabel": "Alcohol",
+          "category": "lifestyle",
+          "fieldName": "alcohol",
+          "dataType": "enum",
+          "widgetType": "single_select",
+          "required": false,
+          "options": [
+            { "value": "never", "label": { "en": "Never", "hi": "कभी नहीं" } },
+            { "value": "occasional", "label": { "en": "Occasional", "hi": "कभी-कभी" } },
+            { "value": "regular", "label": { "en": "Regular", "hi": "नियमित" } }
+          ],
+          "voicePrompt": { "en": "Do you consume alcohol?", "hi": "क्या आप शराब पीते हैं?" },
+          "touchLabel": { "en": "Alcohol?", "hi": "शराब?" },
+          "confirmBack": false,
+          "group": "personal_history",
+          "order": 2
+        }
+      ]
+    }
+  ]
+}
