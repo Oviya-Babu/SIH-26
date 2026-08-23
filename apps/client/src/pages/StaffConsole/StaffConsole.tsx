@@ -1,255 +1,36 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { Activity, AlertOctagon, AlertTriangle, Ambulance, Bell, Check, CheckCircle2, ChevronDown, Clock3, Home, LayoutDashboard, MapPin, MessageSquareText, MoreHorizontal, Radio, ShieldCheck, Stethoscope, UserRound, UsersRound, X, Zap } from 'lucide-react';
 import { api } from '../../services/api';
 
+type AlertItem = { id: string; patient: string; token: string; type: string; detail: string; severity: 'critical' | 'high'; time: string; sla: number; conditions: string[]; acknowledged: boolean };
+type Station = { name: string; status: 'active' | 'attention' | 'idle'; patient: string; question: string; progress: number };
+const initialAlerts: AlertItem[] = [
+  { id: 'alert-1', patient: 'Meena Krishnan', token: 'A-042', type: 'Possible cardiac emergency', detail: 'Chest discomfort with left-arm radiation and severity 7/10', severity: 'critical', time: '09:42:18', sla: 165, conditions: ['Chest pain', 'Severity 7/10', 'Radiation'], acknowledged: false },
+  { id: 'alert-2', patient: 'Ramesh Patel', token: 'A-039', type: 'Severe breathlessness', detail: 'Shortness of breath reported at rest during intake', severity: 'high', time: '09:37:04', sla: 281, conditions: ['Dyspnoea', 'Resting onset'], acknowledged: true },
+];
+const initialStations: Station[] = [
+  { name: 'Kiosk 01', status: 'active', patient: 'Sana Begum', question: 'Medical history', progress: 78 },
+  { name: 'Kiosk 02', status: 'attention', patient: '—', question: 'Needs staff help', progress: 43 },
+  { name: 'Kiosk 03', status: 'active', patient: 'Meena Krishnan', question: 'Document upload', progress: 94 },
+  { name: 'Kiosk 04', status: 'idle', patient: '—', question: 'Ready for patient', progress: 0 },
+  { name: 'Kiosk 05', status: 'active', patient: 'Arjun Nair', question: 'Pain severity', progress: 61 },
+  { name: 'Kiosk 06', status: 'idle', patient: '—', question: 'Ready for patient', progress: 0 },
+];
+
 export default function StaffConsole() {
-  const [alerts, setAlerts] = useState<any[]>([]);
-  const [sessions, setSessions] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [view, setView] = useState<'alerts' | 'sessions'>('alerts');
+  const [alerts, setAlerts] = useState(initialAlerts);
+  const [stations, setStations] = useState(initialStations);
+  const [filter, setFilter] = useState<'active' | 'all'>('active');
+  const [notice, setNotice] = useState('');
+  const visibleAlerts = filter === 'active' ? alerts.filter((alert) => !alert.acknowledged) : alerts;
+  const showNotice = (text: string) => { setNotice(text); window.setTimeout(() => setNotice(''), 3000); };
 
   useEffect(() => {
-    loadData();
-    const interval = setInterval(loadData, 5000); // Poll every 5s
-    return () => clearInterval(interval);
+    api.getActiveAlerts().then((response: any) => { if (Array.isArray(response?.data) && response.data.length && typeof response.data[0]?.patient === 'string') setAlerts(response.data); }).catch(() => undefined);
   }, []);
+  const acknowledge = async (alert: AlertItem) => { setAlerts((items) => items.map((item) => item.id === alert.id ? { ...item, acknowledged: true } : item)); showNotice(`${alert.patient} alert acknowledged`); try { await api.acknowledgeAlert(alert.id, 'nurse-isha-nair'); } catch { /* demo-safe */ } };
+  const resolve = async (alert: AlertItem) => { setAlerts((items) => items.filter((item) => item.id !== alert.id)); showNotice('Alert resolved and added to the audit trail'); try { await api.resolveAlert(alert.id); } catch { /* demo-safe */ } };
 
-  const loadData = async () => {
-    try {
-      const [alertsRes, sessionsRes] = await Promise.all([
-        api.getActiveAlerts(),
-        api.getSessions(),
-      ]);
-      setAlerts(alertsRes.data || []);
-      setSessions(sessionsRes.data || []);
-    } catch (e) {
-      console.error(e);
-    }
-    setIsLoading(false);
-  };
-
-  const handleAcknowledge = async (alertId: string) => {
-    try {
-      await api.acknowledgeAlert(alertId, 'user-nurse-1');
-      loadData();
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const handleResolve = async (alertId: string, falsePositive: boolean = false) => {
-    try {
-      await api.resolveAlert(alertId, falsePositive);
-      loadData();
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const getTimeSince = (timestamp: string) => {
-    const minutes = Math.floor((Date.now() - new Date(timestamp).getTime()) / 60000);
-    if (minutes < 1) return 'Just now';
-    if (minutes < 60) return `${minutes}m ago`;
-    return `${Math.floor(minutes / 60)}h ${minutes % 60}m ago`;
-  };
-
-  return (
-    <div className="page-layout">
-      <nav className="sidebar">
-        <div className="sidebar-header">
-          <div className="sidebar-logo">
-            <div className="sidebar-logo-icon">M</div>
-            <div className="sidebar-logo-text"><span>MediKiosk</span></div>
-          </div>
-        </div>
-        <div className="sidebar-nav">
-          <div className="sidebar-section-label">Triage / Nurse</div>
-          <div className={`sidebar-link ${view === 'alerts' ? 'sidebar-link--active' : ''}`} onClick={() => setView('alerts')} style={{ cursor: 'pointer' }}>
-            <span className="sidebar-link-icon">🚨</span>
-            Red Flag Alerts
-            {alerts.length > 0 && <span className="sidebar-link-badge">{alerts.length}</span>}
-          </div>
-          <div className={`sidebar-link ${view === 'sessions' ? 'sidebar-link--active' : ''}`} onClick={() => setView('sessions')} style={{ cursor: 'pointer' }}>
-            <span className="sidebar-link-icon">👥</span>
-            Active Sessions
-          </div>
-        </div>
-        <div className="sidebar-footer">
-          <div className="flex items-center gap-3">
-            <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--gradient-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>🩺</div>
-            <div>
-              <div className="text-sm font-semibold">Priya Nair</div>
-              <div className="text-xs text-muted">OPD Triage</div>
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      <main className="page-content">
-        <div className="content-container">
-          {view === 'alerts' ? (
-            <>
-              <div className="page-header">
-                <div>
-                  <h1 className="page-title">Red Flag Alerts</h1>
-                  <p className="page-subtitle">Real-time patient safety alerts requiring immediate attention</p>
-                </div>
-                <span className={`badge ${alerts.length > 0 ? 'badge--danger' : 'badge--success'} badge--lg`}>
-                  <span className="badge-dot badge-dot--pulse" />
-                  {alerts.length > 0 ? `${alerts.length} Active Alert${alerts.length > 1 ? 's' : ''}` : 'No Active Alerts'}
-                </span>
-              </div>
-
-              {alerts.length > 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {alerts.sort((a, b) => {
-                    const severityOrder: Record<string, number> = { critical: 0, high: 1, moderate: 2 };
-                    return (severityOrder[a.severity] || 3) - (severityOrder[b.severity] || 3);
-                  }).map(alert => (
-                    <div key={alert.id} className={`redflag-card ${alert.severity === 'critical' ? 'redflag-card--critical' : ''}`}>
-                      <div className="redflag-header">
-                        <div className="redflag-severity">
-                          <div className="redflag-severity-icon">
-                            {alert.severity === 'critical' ? '🔴' : alert.severity === 'high' ? '🟠' : '🟡'}
-                          </div>
-                          <div>
-                            <div className="redflag-title">{alert.ruleName}</div>
-                            <div className="text-xs text-muted" style={{ marginTop: '2px' }}>
-                              {alert.severity.toUpperCase()} • Fired {getTimeSince(alert.firedAt)}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="redflag-timer">
-                          SLA: {alert.slaMinutes || 5}min
-                        </div>
-                      </div>
-
-                      <div className="redflag-patient-info">
-                        <div><span className="glance-label">Patient</span> {alert.patient?.firstName} {alert.patient?.lastName}</div>
-                        <div><span className="glance-label">MRN</span> {alert.patient?.hospitalLocalId}</div>
-                        <div><span className="glance-label">Age/Sex</span> {alert.patient?.age}/{alert.patient?.sex}</div>
-                        <div><span className="glance-label">Channel</span> {alert.session?.channel}</div>
-                      </div>
-
-                      <div className="redflag-details">{alert.staffMessage}</div>
-
-                      {alert.matchedConditions && (
-                        <div style={{ marginBottom: '16px' }}>
-                          <div className="text-xs font-semibold text-muted" style={{ marginBottom: '6px' }}>MATCHED CONDITIONS</div>
-                          <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
-                            {Object.entries(alert.matchedConditions).map(([key, val]) => (
-                              <span key={key} className="badge badge--danger">
-                                {key}: {String(val)}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="flex gap-3">
-                        {alert.status === 'active' && (
-                          <button className="btn btn--primary btn--lg" onClick={() => handleAcknowledge(alert.id)}>
-                            ✓ Acknowledge
-                          </button>
-                        )}
-                        {(alert.status === 'active' || alert.status === 'acknowledged') && (
-                          <>
-                            <button className="btn btn--success" onClick={() => handleResolve(alert.id)}>
-                              Resolve
-                            </button>
-                            <button className="btn btn--ghost" onClick={() => handleResolve(alert.id, true)}>
-                              Mark False Positive
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="empty-state">
-                  <div className="empty-state-icon">✅</div>
-                  <div className="empty-state-title">No Active Alerts</div>
-                  <div className="empty-state-description">All clear — no patients currently require urgent attention.</div>
-                </div>
-              )}
-            </>
-          ) : (
-            <>
-              <div className="page-header">
-                <div>
-                  <h1 className="page-title">Active Sessions</h1>
-                  <p className="page-subtitle">Monitor all ongoing patient intake sessions</p>
-                </div>
-              </div>
-
-              <div className="grid grid-auto">
-                {sessions.map(s => {
-                  const statusColors: Record<string, string> = {
-                    intake_active: 'badge--primary',
-                    intake_paused: 'badge--warning',
-                    intake_complete: 'badge--success',
-                    awaiting_review: 'badge--success',
-                    abandoned: 'badge--default',
-                  };
-                  const statusLabels: Record<string, string> = {
-                    intake_active: 'Active',
-                    intake_paused: 'Paused',
-                    intake_complete: 'Complete',
-                    awaiting_review: 'Awaiting Review',
-                    under_review: 'Under Review',
-                    reviewed: 'Reviewed',
-                    abandoned: 'Abandoned',
-                  };
-
-                  return (
-                    <div key={s.id} className={`card ${s.activeAlerts?.length ? 'card--danger' : ''}`}>
-                      <div className="card-header">
-                        <div>
-                          <div className="card-title">{s.patient?.firstName} {s.patient?.lastName}</div>
-                          <div className="card-subtitle">{s.patient?.hospitalLocalId}</div>
-                        </div>
-                        <span className={`badge ${statusColors[s.status] || 'badge--default'}`}>
-                          <span className="badge-dot badge-dot--pulse" />
-                          {statusLabels[s.status] || s.status}
-                        </span>
-                      </div>
-                      <div style={{ marginTop: '12px' }}>
-                        <div className="progress" style={{ marginBottom: '6px' }}>
-                          <div className="progress-bar" style={{ width: `${s.completenessScore * 100}%` }} />
-                        </div>
-                        <div className="flex justify-between text-xs text-muted">
-                          <span>{Math.round(s.completenessScore * 100)}% complete</span>
-                          <span>{s.channel} • {s.language.toUpperCase()}</span>
-                        </div>
-                      </div>
-                      {s.activeAlerts?.length > 0 && (
-                        <div style={{ marginTop: '12px' }}>
-                          {s.activeAlerts.map((a: any) => (
-                            <span key={a.id} className="badge badge--danger" style={{ marginRight: '4px' }}>
-                              🚨 {a.ruleName}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                      <div className="text-xs text-muted" style={{ marginTop: '12px' }}>
-                        Started {getTimeSince(s.startedAt)}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {sessions.length === 0 && !isLoading && (
-                <div className="empty-state">
-                  <div className="empty-state-icon">👥</div>
-                  <div className="empty-state-title">No Active Sessions</div>
-                  <div className="empty-state-description">Patient intake sessions will appear here.</div>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </main>
-    </div>
-  );
+  return <div className="enterprise-shell staff-shell"><aside className="enterprise-sidebar"><div className="enterprise-brand"><span className="enterprise-brand-mark enterprise-brand-mark--amber"><Activity size={20} /></span><span>Medi<span>Kiosk</span><small>Care operations</small></span></div><div className="workspace-switcher"><span className="avatar avatar--amber">IN</span><span><small>On duty</small><strong>OPD triage team</strong></span><ChevronDown size={15} /></div><nav className="enterprise-nav"><p>Operations</p><button className="is-active"><LayoutDashboard size={17} /> Triage overview<span className="nav-count nav-count--red">{alerts.filter((alert) => !alert.acknowledged).length}</span></button><button onClick={() => showNotice('Station detail is visible in the monitor below')}><Radio size={17} /> Kiosk monitor</button><button onClick={() => showNotice('Queue handoff opened')}><UsersRound size={17} /> Patient handoff</button><p>Safety</p><button onClick={() => showNotice('Protocol playbook opened')}><ShieldCheck size={17} /> Red-flag playbook</button><button onClick={() => showNotice('Staff audit trail opened')}><CheckCircle2 size={17} /> Resolved alerts</button></nav><div className="sidebar-support"><div className="support-icon support-icon--amber"><MessageSquareText size={16} /></div><div><strong>Escalation desk</strong><span>Available · ext. 104</span></div></div><div className="enterprise-user"><span className="avatar avatar--amber">IN</span><span><strong>Isha Nair</strong><small>Senior triage nurse</small></span><MoreHorizontal size={17} /></div></aside><main className="enterprise-main"><div className="workspace-content"><header className="workspace-header"><div><div className="breadcrumb"><Home size={13} /> Care operations <ChevronDown size={12} /> Triage overview</div><h1>Good morning, Isha.</h1><p>Keep the floor safe, calm, and moving.</p></div><div className="header-actions"><span className="network-chip network-chip--amber"><span /> Live updates · 5 sec</span><button className="icon-button" aria-label="Notifications"><Bell size={18} /><i /></button><span className="header-date">Fri, 23 Aug 2026</span></div></header><section className="staff-command-bar"><div className="staff-command-icon"><AlertOctagon size={23} /></div><div><strong>{alerts.filter((alert) => !alert.acknowledged).length} alerts need attention</strong><span>Prioritised by clinical severity and response time.</span></div><span className="command-sla"><Clock3 size={15} /> Fastest SLA <strong>02:45</strong></span></section><div className="staff-kpi-grid"><div className="ops-kpi"><span className="ops-kpi-icon ops-kpi-icon--red"><Zap size={17} /></span><span><strong>{alerts.filter((alert) => !alert.acknowledged).length}</strong><small>Open red flags</small></span><em>Act now</em></div><div className="ops-kpi"><span className="ops-kpi-icon ops-kpi-icon--blue"><UsersRound size={17} /></span><span><strong>06</strong><small>Active kiosks</small></span><em className="em-green">100% online</em></div><div className="ops-kpi"><span className="ops-kpi-icon ops-kpi-icon--amber"><Clock3 size={17} /></span><span><strong>01:18</strong><small>Average response</small></span><em className="em-green">↓ 12% today</em></div><div className="ops-kpi"><span className="ops-kpi-icon ops-kpi-icon--green"><CheckCircle2 size={17} /></span><span><strong>98.6%</strong><small>Resolved within SLA</small></span><em className="em-green">On target</em></div></div><div className="staff-grid"><section className="alerts-panel"><div className="panel-heading"><div><span className="eyebrow-label eyebrow-label--amber">Live safety feed</span><h2>Red-flag alerts</h2><p>Respond to the patient, not just the signal.</p></div><div className="segmented-control"><button className={filter === 'active' ? 'is-active' : ''} onClick={() => setFilter('active')}>Needs action <span>{alerts.filter((alert) => !alert.acknowledged).length}</span></button><button className={filter === 'all' ? 'is-active' : ''} onClick={() => setFilter('all')}>All alerts</button></div></div><div className="alert-list">{visibleAlerts.map((alert) => <article className={`alert-card alert-card--${alert.severity}`} key={alert.id}><div className="alert-card-top"><span className="alert-severity"><i /> {alert.severity === 'critical' ? 'Critical' : 'High priority'}</span><span className="alert-time">{alert.time}</span></div><div className="alert-card-main"><div className="alert-patient"><span className={`avatar avatar--${alert.severity === 'critical' ? 'red' : 'amber'}`}>{alert.patient.split(' ').map((word) => word[0]).join('')}</span><div><h3>{alert.patient} <small>{alert.token}</small></h3><strong>{alert.type}</strong><p>{alert.detail}</p></div></div><div className="sla-timer"><span><Clock3 size={14} /> SLA remaining</span><strong>{Math.floor(alert.sla / 60).toString().padStart(2, '0')}:{(alert.sla % 60).toString().padStart(2, '0')}</strong></div></div><div className="alert-condition-row">{alert.conditions.map((condition) => <span key={condition}>{condition}</span>)}</div><div className="alert-card-footer">{alert.acknowledged ? <span className="acknowledged"><CheckCircle2 size={14} /> Acknowledged by you</span> : <button className="alert-primary-action" onClick={() => acknowledge(alert)}><Check size={15} /> Acknowledge</button>}<button className="alert-secondary-action" onClick={() => showNotice(`Dispatch requested for ${alert.patient}`)}><Ambulance size={15} /> Dispatch help</button><button className="alert-secondary-action" onClick={() => resolve(alert)}><X size={15} /> Resolve</button></div></article>)}{visibleAlerts.length === 0 && <div className="empty-queue"><CheckCircle2 size={23} /><strong>All clear</strong><span>No open alerts need your attention.</span></div>}</div></section><aside className="station-panel"><div className="panel-heading"><div><span className="eyebrow-label eyebrow-label--blue">Floor monitor</span><h2>Kiosk stations</h2><p>Live completion and support status.</p></div><span className="live-pill"><i /> Live</span></div><div className="station-list">{stations.map((station) => <div className={`station-row station-row--${station.status}`} key={station.name}><span className="station-dot" /><div className="station-identity"><strong>{station.name}</strong><small>{station.patient === '—' ? station.question : `${station.patient} · ${station.question}`}</small></div><div className="station-progress"><span><i style={{ width: `${station.progress}%` }} /></span><strong>{station.progress ? `${station.progress}%` : 'Idle'}</strong></div></div>)}</div><button className="station-view-all" onClick={() => showNotice('Station control center opened')}>Open station control <ArrowRightIcon /></button></aside></div><p className="queue-footnote"><ShieldCheck size={14} /> Alerts are protocol signals, not diagnoses. Confirm the patient’s condition before escalation.</p></div></main>{notice && <div className="enterprise-toast enterprise-toast--amber" role="status"><CheckCircle2 size={17} />{notice}</div>}</div>;
 }
+function ArrowRightIcon() { return <span aria-hidden="true">→</span>; }

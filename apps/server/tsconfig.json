@@ -9,7 +9,6 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "outDir": "./dist",
-    "rootDir": "./src",
     "noEmit": true,
     "paths": {
       "@medikiosk/shared": ["../../packages/shared/src"],

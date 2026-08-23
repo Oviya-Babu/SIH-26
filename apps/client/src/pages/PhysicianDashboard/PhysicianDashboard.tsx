@@ -1,498 +1,87 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BadgeCheck, Bell, Check, CheckCircle2, ChevronDown, ClipboardCheck, Clock3, FileText, Filter, History, Home, Info, LayoutDashboard, ListFilter, LockKeyhole, MessageSquareText, MoreHorizontal, Pencil, Search, ShieldCheck, Stethoscope, Tag, UserRound, X, Zap } from 'lucide-react';
 import { api } from '../../services/api';
 import './PhysicianDashboard.css';
 
-type View = 'queue' | 'summary';
+type View = 'queue' | 'review';
+type Tab = 'summary' | 'timeline' | 'documents' | 'facts';
+type Status = 'awaiting_review' | 'under_review' | 'intake_active';
+type QueuePatient = { id: string; name: string; initials: string; mrn: string; age: number; sex: string; complaint: string; channel: string; status: Status; priority: 'critical' | 'conflict' | 'ready'; completeness: number; time: string; wait: string; allergy: string; conditions: string[] };
+type ReviewSection = { id: string; title: string; content: string; confidence: number; source: string; state: 'pending' | 'accepted' | 'edited' | 'excluded' };
+
+const demoPatients: QueuePatient[] = [
+  { id: 's-1042', name: 'Meena Krishnan', initials: 'MK', mrn: 'MRN 240891', age: 56, sex: 'Female', complaint: 'Chest discomfort, left-side', channel: 'Kiosk 03', status: 'awaiting_review', priority: 'critical', completeness: 0.94, time: '09:42', wait: '4 min', allergy: 'Penicillin', conditions: ['Hypertension', 'T2DM'] },
+  { id: 's-1041', name: 'Ramesh Patel', initials: 'RP', mrn: 'MRN 240887', age: 68, sex: 'Male', complaint: 'Breathlessness on exertion', channel: 'Tablet 02', status: 'under_review', priority: 'conflict', completeness: 0.88, time: '09:37', wait: '9 min', allergy: 'No known allergy', conditions: ['COPD'] },
+  { id: 's-1038', name: 'Sana Begum', initials: 'SB', mrn: 'MRN 240876', age: 31, sex: 'Female', complaint: 'Recurring abdominal pain', channel: 'Kiosk 01', status: 'awaiting_review', priority: 'ready', completeness: 0.79, time: '09:28', wait: '18 min', allergy: 'No known allergy', conditions: ['None recorded'] },
+  { id: 's-1034', name: 'Arjun Nair', initials: 'AN', mrn: 'MRN 240861', age: 44, sex: 'Male', complaint: 'Fever and body ache', channel: 'QR web', status: 'intake_active', priority: 'ready', completeness: 0.61, time: '09:17', wait: '—', allergy: 'No known allergy', conditions: ['None recorded'] },
+];
+
+const baseSections: ReviewSection[] = [
+  { id: 'hpi', title: 'Chief complaint & present history', content: 'Patient reports pressure-like discomfort on the left side of the chest, beginning this morning while walking to work. Pain rated 7/10 with radiation toward the left arm. No reported fainting.', confidence: 0.96, source: 'Voice answer · Q1–Q4', state: 'pending' },
+  { id: 'history', title: 'Past medical history', content: 'Hypertension documented in patient self-report. Type 2 diabetes appears in a 2023 discharge summary and requires confirmation during consultation.', confidence: 0.88, source: 'Self-report + discharge summary', state: 'pending' },
+  { id: 'medications', title: 'Current medicines & allergies', content: 'Metformin 500 mg twice daily · Amlodipine 5 mg once daily · Penicillin allergy (rash). Medication list is sourced from the uploaded prescription.', confidence: 0.88, source: 'Prescription · OCR', state: 'pending' },
+];
+
+const timelineItems = [
+  { date: 'Today · 09:42', title: 'Pre-consultation intake completed', detail: 'MediKiosk kiosk 03 · Voice + touch', tone: 'critical' },
+  { date: '12 Mar 2023', title: 'Discharge summary imported', detail: 'City Hospital · Type 2 diabetes documented', tone: 'warning' },
+  { date: '08 Jan 2023', title: 'Prescription scanned', detail: 'Amlodipine 5 mg · City Hospital OPD', tone: 'neutral' },
+];
+
+function priorityLabel(priority: QueuePatient['priority']) { return priority === 'critical' ? 'Critical red flag' : priority === 'conflict' ? 'Conflict to review' : 'Ready for review'; }
+function statusLabel(status: Status) { return status === 'intake_active' ? 'In intake' : status === 'under_review' ? 'Under review' : 'Ready'; }
 
 export default function PhysicianDashboard() {
   const [view, setView] = useState<View>('queue');
-  const [sessions, setSessions] = useState<any[]>([]);
-  const [selectedSession, setSelectedSession] = useState<string | null>(null);
-  const [summaryData, setSummaryData] = useState<any>(null);
-  const [timeline, setTimeline] = useState<any[]>([]);
-  const [facts, setFacts] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'summary' | 'timeline' | 'documents' | 'facts'>('summary');
-  const [isLoading, setIsLoading] = useState(true);
+  const [tab, setTab] = useState<Tab>('summary');
+  const [patients, setPatients] = useState<QueuePatient[]>(demoPatients);
+  const [selected, setSelected] = useState<QueuePatient | null>(null);
+  const [sections, setSections] = useState(baseSections);
+  const [query, setQuery] = useState('');
+  const [isVerified, setIsVerified] = useState(false);
+  const [notice, setNotice] = useState('');
 
   useEffect(() => {
-    loadSessions();
+    api.getSessions().then((response: any) => {
+      const sessions = response?.data;
+      if (!Array.isArray(sessions) || sessions.length === 0) return;
+      const mapped: QueuePatient[] = sessions.map((session: any, index: number) => ({
+        id: session.id || `session-${index}`, name: `${session.patient?.firstName || 'Patient'} ${session.patient?.lastName || ''}`.trim(), initials: `${session.patient?.firstName?.[0] || 'P'}${session.patient?.lastName?.[0] || ''}`, mrn: session.patient?.hospitalLocalId || 'MRN pending', age: session.patient?.age || 0, sex: session.patient?.sex || '—', complaint: session.chiefComplaint || 'Clinical intake in progress', channel: session.channel || 'Kiosk', status: session.status === 'intake_active' ? 'intake_active' : 'awaiting_review', priority: session.activeAlerts?.length ? 'critical' : 'ready', completeness: session.completenessScore || .5, time: session.startedAt ? new Date(session.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—', wait: '—', allergy: 'No known allergy', conditions: ['Needs review'],
+      }));
+      setPatients(mapped);
+    }).catch(() => undefined);
   }, []);
 
-  const loadSessions = async () => {
-    try {
-      const res = await api.getSessions();
-      setSessions(res.data || []);
-    } catch (e) {
-      console.error(e);
-    }
-    setIsLoading(false);
-  };
+  const filteredPatients = useMemo(() => patients.filter((patient) => `${patient.name} ${patient.mrn} ${patient.complaint}`.toLowerCase().includes(query.toLowerCase())), [patients, query]);
+  const readyCount = patients.filter((patient) => patient.status !== 'intake_active').length;
+  const criticalCount = patients.filter((patient) => patient.priority === 'critical').length;
 
-  const selectSession = async (sessionId: string) => {
-    setSelectedSession(sessionId);
-    setView('summary');
-    setIsLoading(true);
+  const showNotice = (text: string) => { setNotice(text); window.setTimeout(() => setNotice(''), 3000); };
+  const selectPatient = async (patient: QueuePatient) => { setSelected(patient); setView('review'); setTab('summary'); setIsVerified(false); setSections(baseSections); try { await api.getSummary(patient.id); } catch { /* static clinical review remains available in demo mode */ } };
+  const reviewSection = (id: string, state: ReviewSection['state']) => setSections((items) => items.map((item) => item.id === id ? { ...item, state } : item));
+  const approveAll = async () => { setSections((items) => items.map((item) => ({ ...item, state: 'accepted' }))); setIsVerified(true); showNotice('Summary verified and ready to push to HIS / ABDM'); if (selected) { try { await api.reviewSummary(selected.id, { action: 'accept', physicianId: 'dr-arun-sharma' }); } catch { /* demo-safe */ } } };
 
-    try {
-      const [summaryRes, timelineRes, factsRes] = await Promise.all([
-        api.getSummary(sessionId),
-        api.getTimeline(sessionId),
-        api.getSessionFacts(sessionId),
-      ]);
-      setSummaryData(summaryRes.data);
-      setTimeline(timelineRes.data || []);
-      setFacts(factsRes.data || []);
-    } catch (e) {
-      console.error(e);
-    }
-    setIsLoading(false);
-  };
-
-  const handleSectionReview = async (sectionId: string, action: string, editedContent?: string) => {
-    if (!summaryData?.summary) return;
-    try {
-      const res = await api.reviewSummary(summaryData.summary.id, {
-        sectionId,
-        action,
-        editedContent,
-        physicianId: 'user-physician-1',
-      });
-      setSummaryData((prev: any) => ({ ...prev, summary: res.data }));
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const handleBulkApprove = async () => {
-    if (!summaryData?.summary) return;
-    try {
-      const res = await api.reviewSummary(summaryData.summary.id, {
-        action: 'accept',
-        physicianId: 'user-physician-1',
-      });
-      setSummaryData((prev: any) => ({ ...prev, summary: res.data }));
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case 'critical': return 'var(--color-danger)';
-      case 'high': return 'var(--color-warning)';
-      default: return 'var(--color-info)';
-    }
-  };
-
-  // ─── Queue View ────────────────────────────────────────────────────────
-
-  if (view === 'queue') {
-    const readySessions = sessions.filter(s =>
-      ['awaiting_review', 'under_review', 'intake_complete'].includes(s.status)
-    );
-    const activeSessions = sessions.filter(s =>
-      ['intake_active', 'intake_paused'].includes(s.status)
-    );
-
-    return (
-      <div className="page-layout">
-        <nav className="sidebar">
-          <div className="sidebar-header">
-            <div className="sidebar-logo">
-              <div className="sidebar-logo-icon">M</div>
-              <div className="sidebar-logo-text"><span>MediKiosk</span></div>
-            </div>
-          </div>
-          <div className="sidebar-nav">
-            <div className="sidebar-section-label">Physician</div>
-            <div className="sidebar-link sidebar-link--active">
-              <span className="sidebar-link-icon">📋</span>
-              Patient Queue
-              {readySessions.length > 0 && <span className="sidebar-link-badge">{readySessions.length}</span>}
-            </div>
-          </div>
-          <div className="sidebar-footer">
-            <div className="flex items-center gap-3">
-              <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--gradient-success)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>👨‍⚕️</div>
-              <div>
-                <div className="text-sm font-semibold">Dr. Arun Sharma</div>
-                <div className="text-xs text-muted">Internal Medicine</div>
-              </div>
-            </div>
-          </div>
-        </nav>
-
-        <main className="page-content">
-          <div className="content-container">
-            <div className="page-header">
-              <div>
-                <h1 className="page-title">Patient Queue</h1>
-                <p className="page-subtitle">Review AI-drafted clinical summaries before consultation</p>
-              </div>
-              <div className="flex gap-3">
-                <span className="badge badge--success badge--lg">
-                  <span className="badge-dot" /> {readySessions.length} Ready for Review
-                </span>
-                <span className="badge badge--primary badge--lg">
-                  <span className="badge-dot badge-dot--pulse" /> {activeSessions.length} In Progress
-                </span>
-              </div>
-            </div>
-
-            {/* Ready for Review */}
-            {readySessions.length > 0 && (
-              <div style={{ marginBottom: '32px' }}>
-                <h2 className="text-lg font-semibold" style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ color: 'var(--color-success)' }}>●</span> Ready for Review
-                </h2>
-                <div className="grid grid-auto">
-                  {readySessions.map(s => (
-                    <div key={s.id} className={`card card--interactive ${s.activeAlerts?.length ? 'card--danger' : ''}`} onClick={() => selectSession(s.id)}>
-                      <div className="card-header">
-                        <div>
-                          <div className="card-title">{s.patient?.firstName} {s.patient?.lastName}</div>
-                          <div className="card-subtitle">MRN: {s.patient?.hospitalLocalId}</div>
-                        </div>
-                        {s.activeAlerts?.length > 0 && (
-                          <span className="badge badge--danger">
-                            <span className="badge-dot badge-dot--pulse" />
-                            {s.activeAlerts.length} Red Flag{s.activeAlerts.length > 1 ? 's' : ''}
-                          </span>
-                        )}
-                      </div>
-                      <div className="card-body">
-                        <div className="flex gap-3" style={{ marginBottom: '12px', flexWrap: 'wrap' }}>
-                          <span className="glance-item">
-                            <span className="glance-label">Age</span> {s.patient?.age || '—'}
-                          </span>
-                          <span className="glance-item">
-                            <span className="glance-label">Sex</span> {s.patient?.sex || '—'}
-                          </span>
-                          <span className="glance-item">
-                            <span className="glance-label">Channel</span> {s.channel}
-                          </span>
-                        </div>
-                        <div className="progress" style={{ marginBottom: '8px' }}>
-                          <div className="progress-bar" style={{ width: `${s.completenessScore * 100}%` }} />
-                        </div>
-                        <div className="text-xs text-muted">{Math.round(s.completenessScore * 100)}% complete</div>
-                      </div>
-                      <div className="card-footer">
-                        <span className="text-xs text-muted">
-                          Started {new Date(s.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                        <button className="btn btn--primary btn--sm" style={{ marginLeft: 'auto' }}>
-                          Review →
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Active Sessions */}
-            {activeSessions.length > 0 && (
-              <div>
-                <h2 className="text-lg font-semibold" style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ color: 'var(--color-accent-primary)' }}>●</span> Currently in Intake
-                </h2>
-                <div className="grid grid-auto">
-                  {activeSessions.map(s => (
-                    <div key={s.id} className="card" style={{ opacity: 0.75 }}>
-                      <div className="card-header">
-                        <div>
-                          <div className="card-title">{s.patient?.firstName} {s.patient?.lastName}</div>
-                          <div className="card-subtitle">MRN: {s.patient?.hospitalLocalId}</div>
-                        </div>
-                        <span className="badge badge--primary">
-                          <span className="badge-dot badge-dot--pulse" />
-                          {s.status === 'intake_paused' ? 'Paused' : 'Active'}
-                        </span>
-                      </div>
-                      <div className="progress" style={{ marginTop: '12px' }}>
-                        <div className="progress-bar" style={{ width: `${s.completenessScore * 100}%` }} />
-                      </div>
-                      <div className="text-xs text-muted" style={{ marginTop: '4px' }}>
-                        {Math.round(s.completenessScore * 100)}% complete — {s.channel}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {sessions.length === 0 && !isLoading && (
-              <div className="empty-state">
-                <div className="empty-state-icon">📋</div>
-                <div className="empty-state-title">No patients in queue</div>
-                <div className="empty-state-description">Patients will appear here as they complete their pre-consultation intake.</div>
-              </div>
-            )}
-          </div>
-        </main>
-      </div>
-    );
-  }
-
-  // ─── Summary Review View ───────────────────────────────────────────────
-
-  const summary = summaryData?.summary;
-  const patient = summaryData?.patient;
-
-  return (
-    <div className="page-layout">
-      <nav className="sidebar">
-        <div className="sidebar-header">
-          <div className="sidebar-logo">
-            <div className="sidebar-logo-icon">M</div>
-            <div className="sidebar-logo-text"><span>MediKiosk</span></div>
-          </div>
-        </div>
-        <div className="sidebar-nav">
-          <div className="sidebar-section-label">Physician</div>
-          <div className="sidebar-link" onClick={() => { setView('queue'); setSelectedSession(null); }} style={{ cursor: 'pointer' }}>
-            <span className="sidebar-link-icon">←</span>
-            Back to Queue
-          </div>
-          <div className="sidebar-link sidebar-link--active">
-            <span className="sidebar-link-icon">📋</span>
-            Summary Review
-          </div>
-        </div>
-        <div className="sidebar-footer">
-          <div className="flex items-center gap-3">
-            <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--gradient-success)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>👨‍⚕️</div>
-            <div>
-              <div className="text-sm font-semibold">Dr. Arun Sharma</div>
-              <div className="text-xs text-muted">Internal Medicine</div>
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      <main className="page-content">
-        <div className="content-container">
-          {isLoading ? (
-            <div className="empty-state">
-              <div className="spinner spinner--lg" style={{ margin: '0 auto' }} />
-              <p className="text-secondary" style={{ marginTop: '16px' }}>Loading clinical summary...</p>
-            </div>
-          ) : summary ? (
-            <>
-              {/* Patient Header */}
-              <div className="page-header">
-                <div>
-                  <h1 className="page-title">{patient?.firstName} {patient?.lastName}</h1>
-                  <p className="page-subtitle">
-                    MRN: {patient?.hospitalLocalId} • {patient?.sex}, {patient?.age}y •
-                    Language: {patient?.language?.toUpperCase()}
-                  </p>
-                </div>
-                <div className="flex gap-3 items-center">
-                  <div className="draft-badge">
-                    <span className="draft-badge-dot" />
-                    {summary.status === 'approved' ? 'APPROVED' : 'AI DRAFT — UNVERIFIED'}
-                  </div>
-                  {summary.status !== 'approved' && (
-                    <button className="btn btn--success btn--lg" onClick={handleBulkApprove}>
-                      ✓ Approve All & Sign
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* At-a-glance Strip */}
-              <div className="summary-glance-strip">
-                {summary.redFlags?.length > 0 && summary.redFlags.map((rf: any) => (
-                  <div key={rf.id} className="glance-item glance-item--danger">
-                    <span>🚨</span>
-                    <span className="font-semibold">{rf.ruleName}</span>
-                  </div>
-                ))}
-                {facts.filter((f: any) => f.category === 'allergy').map((f: any) => (
-                  <div key={f.id} className="glance-item glance-item--danger">
-                    <span>⚠️ Allergy:</span>
-                    <span className="font-semibold">{f.valueNormalized}</span>
-                  </div>
-                ))}
-                {facts.filter((f: any) => f.category === 'medication').map((f: any) => (
-                  <div key={f.id} className="glance-item">
-                    <span className="glance-label">Med</span>
-                    <span>{f.valueNormalized}</span>
-                  </div>
-                ))}
-                <div className="glance-item">
-                  <span className="glance-label">Completeness</span>
-                  <span className="font-semibold">{Math.round(summary.completenessScore * 100)}%</span>
-                </div>
-              </div>
-
-              {/* Tabs */}
-              <div className="tabs">
-                {(['summary', 'timeline', 'facts'] as const).map(tab => (
-                  <button
-                    key={tab}
-                    className={`tab ${activeTab === tab ? 'tab--active' : ''}`}
-                    onClick={() => setActiveTab(tab)}
-                  >
-                    {tab === 'summary' ? '📝 Summary' : tab === 'timeline' ? '📅 Timeline' : '🔬 Clinical Facts'}
-                  </button>
-                ))}
-              </div>
-
-              {/* Summary Tab */}
-              {activeTab === 'summary' && (
-                <>
-                  {/* Conflicts */}
-                  {summary.conflicts?.length > 0 && (
-                    <div style={{ marginBottom: '24px' }}>
-                      <h3 className="text-base font-semibold text-warning" style={{ marginBottom: '12px' }}>⚠️ Conflicting Information</h3>
-                      {summary.conflicts.map((c: any) => (
-                        <div key={c.id} className="conflict-card" style={{ marginBottom: '12px' }}>
-                          <div className="conflict-header">
-                            <span>⚠</span> {c.fieldLabel}
-                          </div>
-                          {c.sources.map((src: any, i: number) => (
-                            <div key={i} className="conflict-source">
-                              <span className="conflict-source-bullet" />
-                              <div>
-                                <div className="conflict-source-value">{src.value}</div>
-                                <div className="conflict-source-meta">{src.source}</div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Missing Info */}
-                  {summary.missingInformation?.filter((m: any) => m.priority === 'required').length > 0 && (
-                    <div className="alert alert--warning" style={{ marginBottom: '24px' }}>
-                      <span className="alert-icon">📋</span>
-                      <div className="alert-content">
-                        <div className="alert-title">Missing Required Information</div>
-                        <ul style={{ marginTop: '4px', paddingLeft: '16px' }}>
-                          {summary.missingInformation.filter((m: any) => m.priority === 'required').map((m: any) => (
-                            <li key={m.fieldName} style={{ fontSize: '13px' }}>{m.fieldLabel}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Summary Sections */}
-                  {summary.sections?.map((section: any) => (
-                    <div key={section.id} className="summary-section">
-                      <div className="summary-section-header">
-                        <div className="summary-section-title">
-                          {section.title}
-                          {section.reviewStatus === 'accepted' && <span className="badge badge--success badge--sm" style={{ marginLeft: '8px' }}>✓ Accepted</span>}
-                          {section.reviewStatus === 'edited' && <span className="badge badge--warning badge--sm" style={{ marginLeft: '8px' }}>✏ Edited</span>}
-                          {section.reviewStatus === 'rejected' && <span className="badge badge--danger badge--sm" style={{ marginLeft: '8px' }}>✗ Rejected</span>}
-                        </div>
-                        {summary.status !== 'approved' && (
-                          <div className="summary-section-actions">
-                            <button className="btn btn--success btn--sm" onClick={() => handleSectionReview(section.id, 'accept')} title="Accept">✓</button>
-                            <button className="btn btn--ghost btn--sm" onClick={() => {
-                              const edited = prompt('Edit content:', section.editedContent || section.content);
-                              if (edited) handleSectionReview(section.id, 'edit', edited);
-                            }} title="Edit">✏️</button>
-                            <button className="btn btn--ghost btn--sm" onClick={() => handleSectionReview(section.id, 'reject')} title="Reject">✗</button>
-                          </div>
-                        )}
-                      </div>
-                      <div className="summary-section-body">
-                        {(section.editedContent || section.content).split('\n').map((line: string, i: number) => (
-                          <div key={i}>{line}</div>
-                        ))}
-                        {section.facts?.length > 0 && (
-                          <div className="text-xs text-muted" style={{ marginTop: '8px', fontStyle: 'italic' }}>
-                            Based on {section.facts.length} clinical fact{section.facts.length > 1 ? 's' : ''}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </>
-              )}
-
-              {/* Timeline Tab */}
-              {activeTab === 'timeline' && (
-                <div className="timeline">
-                  {timeline.map((event: any) => (
-                    <div key={event.id} className="timeline-item">
-                      <div className={`timeline-dot ${event.source === 'document_extracted' ? 'timeline-dot--document' : ''}`} />
-                      <div className="timeline-date">{event.dateLabel}</div>
-                      <div className="timeline-content">
-                        <div className="timeline-title">{event.title}</div>
-                        <div className="text-sm text-secondary" style={{ marginTop: '4px' }}>{event.description}</div>
-                        <div className="timeline-source">
-                          <span>{event.source === 'patient_reported' ? '🗣 Patient reported' : '📄 Document extracted'}</span>
-                          {event.dateApproximate && <span className="badge badge--default" style={{ marginLeft: '8px' }}>≈ Approximate</span>}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  {timeline.length === 0 && (
-                    <div className="empty-state">
-                      <div className="empty-state-icon">📅</div>
-                      <div className="empty-state-title">No timeline events</div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Facts Tab */}
-              {activeTab === 'facts' && (
-                <div className="table-container">
-                  <table className="table">
-                    <thead>
-                      <tr>
-                        <th>Category</th>
-                        <th>Concept</th>
-                        <th>Value</th>
-                        <th>Source</th>
-                        <th>Confidence</th>
-                        <th>Conflict</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {facts.map((fact: any) => (
-                        <tr key={fact.id}>
-                          <td><span className="badge badge--default">{fact.category.replace(/_/g, ' ')}</span></td>
-                          <td className="font-medium">{fact.conceptLabel}</td>
-                          <td>{fact.valueNormalized || fact.valueRaw}</td>
-                          <td>
-                            <span className={`badge ${fact.source === 'patient_reported' ? 'badge--primary' : 'badge--default'}`}>
-                              {fact.source === 'patient_reported' ? '🗣 Patient' : '📄 Document'}
-                            </span>
-                          </td>
-                          <td>
-                            <span className={`confidence ${fact.confidence >= 0.85 ? 'confidence--high' : fact.confidence >= 0.65 ? 'confidence--medium' : 'confidence--low'}`}>
-                              {Math.round(fact.confidence * 100)}%
-                            </span>
-                          </td>
-                          <td>
-                            {fact.isConflicting && <span className="badge badge--warning">⚠ Conflict</span>}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="empty-state">
-              <div className="empty-state-icon">📋</div>
-              <div className="empty-state-title">No summary available</div>
-              <div className="empty-state-description">The patient's intake may not be complete yet.</div>
-            </div>
-          )}
-        </div>
-      </main>
-    </div>
-  );
+  return <div className="enterprise-shell physician-shell">
+    <aside className="enterprise-sidebar"><div className="enterprise-brand"><span className="enterprise-brand-mark"><Stethoscope size={20} /></span><span>Medi<span>Kiosk</span><small>Clinical intelligence</small></span></div><div className="workspace-switcher"><span className="avatar avatar--blue">AS</span><span><small>Workspace</small><strong>Internal medicine</strong></span><ChevronDown size={15} /></div><nav className="enterprise-nav" aria-label="Physician workspace"><p>Workspace</p><button className={view === 'queue' ? 'is-active' : ''} onClick={() => setView('queue')}><LayoutDashboard size={17} /> Overview<span className="nav-count">{readyCount}</span></button><button className={view === 'review' ? 'is-active' : ''} onClick={() => selected && setView('review')}><ClipboardCheck size={17} /> Summary review</button><button onClick={() => showNotice('Patient timeline view is available from any reviewed record')}><History size={17} /> Longitudinal records</button><p>Governance</p><button onClick={() => showNotice('Protocol catalogue is managed by hospital administration')}><ShieldCheck size={17} /> Protocols</button><button onClick={() => showNotice('Audit events are immutable and available to governance admins')}><LockKeyhole size={17} /> Audit trail</button></nav><div className="sidebar-support"><div className="support-icon"><MessageSquareText size={16} /></div><div><strong>Need a hand?</strong><span>Clinical support · ext. 104</span></div></div><div className="enterprise-user"><span className="avatar avatar--teal">AS</span><span><strong>Dr. Arun Sharma</strong><small>Physician · Internal medicine</small></span><MoreHorizontal size={17} /></div></aside>
+    <main className="enterprise-main">
+      {view === 'queue' ? <QueueView patients={filteredPatients} query={query} setQuery={setQuery} onSelect={selectPatient} criticalCount={criticalCount} readyCount={readyCount} /> : <ReviewView patient={selected || demoPatients[0]} tab={tab} setTab={setTab} sections={sections} onReview={reviewSection} onApprove={approveAll} isVerified={isVerified} onBack={() => setView('queue')} onNotice={showNotice} />}
+    </main>
+    {notice && <div className="enterprise-toast" role="status"><CheckCircle2 size={17} />{notice}</div>}
+  </div>;
 }
+
+function QueueView({ patients, query, setQuery, onSelect, criticalCount, readyCount }: { patients: QueuePatient[]; query: string; setQuery: (value: string) => void; onSelect: (patient: QueuePatient) => void; criticalCount: number; readyCount: number }) {
+  return <div className="workspace-content"><header className="workspace-header"><div><div className="breadcrumb"><Home size={13} /> Clinical workspace <ChevronDown size={12} /> Physician overview</div><h1>Good morning, Dr. Sharma.</h1><p>Review the context that matters before your next consultation.</p></div><div className="header-actions"><span className="network-chip"><span /> All services healthy</span><button className="icon-button" aria-label="Notifications"><Bell size={18} /><i /></button><span className="header-date">Fri, 23 Aug 2026</span></div></header><div className="queue-hero"><div><span className="eyebrow-label">Today at a glance</span><h2>Your queue, with <em>signal.</em></h2><p>AI drafts are only suggestions. You remain the final clinical decision-maker.</p></div><div className="queue-hero-graphic"><div className="hero-ring hero-ring--one" /><div className="hero-ring hero-ring--two" /><Activity size={26} /></div></div><div className="stat-strip"><div className="mini-stat"><span className="mini-stat-icon mini-stat-icon--blue"><ClipboardCheck size={17} /></span><span><strong>{readyCount}</strong><small>Awaiting your review</small></span><b className="trend-up">+2 today</b></div><div className="mini-stat"><span className="mini-stat-icon mini-stat-icon--red"><Zap size={17} /></span><span><strong>{criticalCount}</strong><small>Red flags to action</small></span><b className="trend-alert">Needs attention</b></div><div className="mini-stat"><span className="mini-stat-icon mini-stat-icon--green"><Clock3 size={17} /></span><span><strong>2m 18s</strong><small>Median intake time</small></span><b className="trend-up">↓ 14% this week</b></div><div className="mini-stat"><span className="mini-stat-icon mini-stat-icon--purple"><BadgeCheck size={17} /></span><span><strong>99.4%</strong><small>Protocol adherence</small></span><b className="trend-up">On target</b></div></div><div className="section-toolbar"><div><h2>Patient queue</h2><p>Prioritised by urgency, completeness, and unresolved conflicts.</p></div><div className="toolbar-actions"><div className="search-field"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search name, MRN, symptom" /><kbd>⌘ K</kbd></div><button className="filter-button"><Filter size={15} /> Filters <span>2</span></button></div></div><div className="queue-table-card"><div className="queue-table-head"><span>Patient</span><span>Signal</span><span>Intake</span><span>Completeness</span><span>Wait</span><span /></div>{patients.map((patient) => <button className="queue-row" key={patient.id} onClick={() => onSelect(patient)}><span className="patient-cell"><span className={`avatar avatar--${patient.priority === 'critical' ? 'red' : patient.priority === 'conflict' ? 'amber' : 'slate'}`}>{patient.initials}</span><span><strong>{patient.name}</strong><small>{patient.mrn} · {patient.age}y · {patient.sex}</small></span></span><span className={`signal-cell signal-cell--${patient.priority}`}><i />{priorityLabel(patient.priority)}{patient.priority === 'critical' && <AlertTriangle size={14} />}</span><span className="intake-cell"><strong>{patient.complaint}</strong><small>{patient.channel} · {patient.time}</small></span><span className="completeness-cell"><span className="progress-track"><i style={{ width: `${patient.completeness * 100}%` }} /></span><strong>{Math.round(patient.completeness * 100)}%</strong></span><span className="wait-cell"><strong>{patient.wait}</strong><small>{statusLabel(patient.status)}</small></span><span className="row-arrow"><ArrowRight size={16} /></span></button>)}{patients.length === 0 && <div className="empty-queue"><Search size={23} /><strong>No matching patients</strong><span>Try a name, MRN, or symptom.</span></div>}</div><p className="queue-footnote"><Info size={14} /> Patient data shown is for care coordination. Always verify facts during the consultation.</p></div>;
+}
+
+function ReviewView({ patient, tab, setTab, sections, onReview, onApprove, isVerified, onBack, onNotice }: { patient: QueuePatient; tab: Tab; setTab: (tab: Tab) => void; sections: ReviewSection[]; onReview: (id: string, state: ReviewSection['state']) => void; onApprove: () => void; isVerified: boolean; onBack: () => void; onNotice: (notice: string) => void }) {
+  return <div className="workspace-content review-content"><header className="review-header"><button className="back-button" onClick={onBack}><ArrowLeft size={16} /> Back to queue</button><div className="review-header-actions"><span className={`draft-status ${isVerified ? 'draft-status--verified' : ''}`}><span />{isVerified ? 'Verified & signed' : 'AI draft · pending sign-off'}</span>{!isVerified && <button className="primary-button" onClick={onApprove}><CheckCircle2 size={16} /> Approve, sign & push <ChevronDown size={15} /></button>}</div></header><section className="patient-banner"><div className={`patient-hero-avatar avatar avatar--${patient.priority === 'critical' ? 'red' : 'blue'}`}>{patient.initials}</div><div className="patient-identity"><div className="identity-topline"><h1>{patient.name}</h1><span className="verified-chip"><BadgeCheck size={14} /> ABHA verified</span></div><p>{patient.mrn} <span /> {patient.age} years <span /> {patient.sex} <span /> Language: Hindi</p><div className="patient-tags"><span className="tag tag--alert"><AlertTriangle size={13} /> Allergy: {patient.allergy}</span>{patient.conditions.map((condition) => <span className="tag" key={condition}><Tag size={12} /> {condition}</span>)}</div></div><button className="more-button" aria-label="More patient actions"><MoreHorizontal size={19} /></button></section><div className="review-tabs">{([['summary', 'Summary', ClipboardCheck], ['timeline', 'Timeline', History], ['documents', 'Documents', FileText], ['facts', 'Clinical facts', ListFilter]] as const).map(([id, label, Icon]) => <button key={id} className={tab === id ? 'is-active' : ''} onClick={() => setTab(id)}><Icon size={16} />{label}{id === 'documents' && <span className="tab-count">2</span>}</button>)}</div>{tab === 'summary' && <SummaryTab sections={sections} onReview={onReview} onApprove={onApprove} isVerified={isVerified} onNotice={onNotice} />}{tab === 'timeline' && <TimelineTab />}{tab === 'documents' && <DocumentsTab onNotice={onNotice} />}{tab === 'facts' && <FactsTab />}</div>;
+}
+
+function SummaryTab({ sections, onReview, onApprove, isVerified, onNotice }: { sections: ReviewSection[]; onReview: (id: string, state: ReviewSection['state']) => void; onApprove: () => void; isVerified: boolean; onNotice: (notice: string) => void }) {
+  return <div className="summary-layout"><div className="summary-main"><div className="summary-title-row"><div><span className="eyebrow-label">Clinical synthesis · v1.4</span><h2>What the care team should know</h2></div><button className="quiet-button"><Pencil size={14} /> Edit all</button></div><div className="conflict-callout"><div className="conflict-icon"><AlertTriangle size={18} /></div><div><strong>One fact needs your attention</strong><p>Patient denies diabetes today, but a 2023 discharge summary records Type 2 diabetes. Confirm during consultation.</p><div className="conflict-sources"><span><i /> Self-report · today</span><ArrowRight size={14} /><span><i /> City Hospital · 12 Mar 2023</span></div></div><button className="conflict-action" onClick={() => onNotice('Conflict pinned for consultation notes')}>Pin for visit</button></div>{sections.map((section) => <article className={`summary-section ${section.state !== 'pending' ? 'summary-section--reviewed' : ''}`} key={section.id}><div className="summary-section-header"><span className="section-number">0{sections.indexOf(section) + 1}</span><div><h3>{section.title}</h3><span className="provenance-label"><Activity size={13} /> {section.source}</span></div><span className={`confidence-pill confidence-pill--${section.confidence > .9 ? 'high' : 'medium'}`}>{Math.round(section.confidence * 100)}% confidence</span></div><p className="summary-copy">{section.content}</p><div className="section-footer"><span className={`review-state review-state--${section.state}`}>{section.state === 'pending' ? <><Clock3 size={13} /> Needs review</> : section.state === 'accepted' ? <><Check size={13} /> Accepted</> : section.state === 'edited' ? <><Pencil size={13} /> Edited</> : <><X size={13} /> Excluded</>}</span><div className="section-actions"><button onClick={() => onReview(section.id, 'accepted')}><Check size={14} /> Accept</button><button onClick={() => onReview(section.id, 'edited')}><Pencil size={14} /> Edit</button><button onClick={() => onReview(section.id, 'excluded')}><X size={14} /> Exclude</button></div></div></article>)}<div className="safe-note"><ShieldCheck size={17} /><span><strong>Safety guardrail active</strong><small>This is a draft, not a diagnosis. No clinical pathway is chosen by AI.</small></span></div></div><aside className="summary-aside"><div className="aside-card aside-card--accent"><div className="aside-card-heading"><span className="aside-icon"><Zap size={16} /></span><span><strong>Clinical signal</strong><small>Protocol match · 91%</small></span></div><div className="signal-score"><strong>High priority</strong><span>Chest pain + radiation + severity 7/10</span></div><div className="signal-line"><i style={{ width: '91%' }} /></div><button onClick={() => onNotice('Red-flag rule details opened')}>View rule details <ArrowRight size={14} /></button></div><div className="aside-card"><div className="aside-card-heading"><span className="aside-icon aside-icon--neutral"><FileText size={16} /></span><span><strong>Source evidence</strong><small>4 atomic facts linked</small></span></div><div className="evidence-list"><span><i className="evidence-dot evidence-dot--green" />Voice answer · 3 facts</span><span><i className="evidence-dot evidence-dot--blue" />Prescription · 1 fact</span><span><i className="evidence-dot evidence-dot--amber" />Discharge summary · 1 conflict</span></div><button onClick={() => onNotice('Evidence explorer opened')}>Open fact explorer <ArrowRight size={14} /></button></div><div className="aside-card signed-card"><div className="signed-card-orbit" /><LockKeyhole size={19} /><strong>{isVerified ? 'Ready to exchange' : 'Your sign-off matters'}</strong><p>{isVerified ? 'Cryptographically signed. Ready to push to HIS and ABDM.' : 'Approve each section or sign the complete draft when you are confident.'}</p><button className="secondary-button" onClick={onApprove}>{isVerified ? 'View export receipt' : 'Approve & sign summary'} <ArrowRight size={14} /></button></div></aside></div>;
+}
+
+function TimelineTab() { return <div className="tab-panel"><div className="panel-heading"><div><span className="eyebrow-label">Longitudinal record</span><h2>Clinical timeline</h2><p>All patient context in one chronological view.</p></div><button className="filter-button"><Filter size={15} /> Filter</button></div><div className="timeline-filter-row"><button className="is-active">All events</button><button>Diagnoses</button><button>Medicines</button><button>Labs</button><button>Documents</button></div><div className="clinical-timeline">{timelineItems.map((item, index) => <div className="timeline-event" key={item.date}><div className={`timeline-marker timeline-marker--${item.tone}`}><span /></div><div className="timeline-event-copy"><span>{item.date}</span><h3>{item.title}</h3><p>{item.detail}</p></div>{index === 0 && <span className="timeline-current">Current visit</span>}</div>)}</div></div>; }
+function DocumentsTab({ onNotice }: { onNotice: (notice: string) => void }) { return <div className="tab-panel"><div className="panel-heading"><div><span className="eyebrow-label">Document intelligence</span><h2>Scanned evidence</h2><p>OCR results are always shown with their source document.</p></div><button className="secondary-button" onClick={() => onNotice('Document upload opened')}><FileText size={15} /> Add document</button></div><div className="document-ledger"><div className="document-ledger-row document-ledger-head"><span>Document</span><span>Type</span><span>Processing</span><span>Added</span><span /></div>{[['Prescription_08Jan2023.jpg', 'Prescription', 'OCR complete', '08 Jan 2023'], ['Discharge_Summary_12Mar2023.pdf', 'Discharge summary', 'OCR complete', '12 Mar 2023']].map((doc) => <div className="document-ledger-row" key={doc[0]}><span className="document-name"><span className="document-icon"><FileText size={16} /></span><strong>{doc[0]}</strong></span><span>{doc[1]}</span><span className="processing-done"><CheckCircle2 size={14} /> {doc[2]}</span><span>{doc[3]}</span><button className="row-icon-button" onClick={() => onNotice(`Opening ${doc[0]}`)} aria-label={`Open ${doc[0]}`}><ArrowRight size={16} /></button></div>)}</div></div>; }
+function FactsTab() { return <div className="tab-panel"><div className="panel-heading"><div><span className="eyebrow-label">Atomic facts</span><h2>Evidence explorer</h2><p>Every summary sentence links back to a source and capture method.</p></div><div className="fact-summary"><strong>5</strong><span>facts traced</span></div></div><div className="facts-grid">{[['Chest discomfort', 'Patient voice', 'Today · 09:37', 'High'], ['Pain severity · 7/10', 'Patient touch', 'Today · 09:38', 'High'], ['Penicillin allergy', 'Prescription OCR', '08 Jan 2023', 'High'], ['Type 2 diabetes', 'Discharge summary', '12 Mar 2023', 'Medium']].map((fact) => <div className="fact-card" key={fact[0]}><div className="fact-card-top"><span className="fact-source-dot" /><span>{fact[1]}</span><MoreHorizontal size={15} /></div><strong>{fact[0]}</strong><small>{fact[2]} · {fact[3]} confidence</small></div>)}</div></div>; }

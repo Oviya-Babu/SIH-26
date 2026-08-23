@@ -53,7 +53,7 @@ class TimelineEngine {
       category: this.formatCategory(fact.category),
       title,
       description,
-      source: fact.source,
+      source: fact.source === 'document_extracted' ? 'document_extracted' : 'patient_reported',
       provenanceRef: fact.provenanceRef,
       metadata: fact.metadata,
     };
