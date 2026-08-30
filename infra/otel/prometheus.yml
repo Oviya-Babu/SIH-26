@@ -1,0 +1,19 @@
+# Prometheus scrape configuration (CLAUDE.md §39).
+#
+# Prometheus scrapes the OpenTelemetry Collector, NOT the services directly.
+# That is the point: §28 makes the collector the single redaction choke point, so
+# a direct scrape would bypass it.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    deployment: medikiosk-local
+
+scrape_configs:
+  - job_name: otel-collector
+    static_configs:
+      - targets: ['otel-collector:8889']
+
+  - job_name: otel-collector-self
+    static_configs:
+      - targets: ['otel-collector:8888']

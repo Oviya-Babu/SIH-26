@@ -35,8 +35,15 @@ import asyncpg
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CONTENT_ROOT = REPO_ROOT / "content"
 
+# Tenant ids are FIXED for the demo tenants so that the Keycloak realm can carry
+# the tenant_id claim as a literal, and a token therefore always refers to a
+# tenant that exists. Deterministic and reproducible; both are synthetic.
+DEMO_TENANT_ID = "11111111-1111-1111-1111-111111111111"
+CONTROL_TENANT_ID = "22222222-2222-2222-2222-222222222222"
+
 TENANTS: tuple[dict[str, Any], ...] = (
     {
+        "id": DEMO_TENANT_ID,
         "slug": "sih-demo-hospital",
         "display_name": "SIH Demonstration District Hospital",
         "primary": True,
@@ -44,6 +51,7 @@ TENANTS: tuple[dict[str, Any], ...] = (
     {
         # Exists ONLY to prove tenant isolation. A physician in tenant A must get
         # a real 403 for a session in tenant B (§64.8).
+        "id": CONTROL_TENANT_ID,
         "slug": "isolation-control-hospital",
         "display_name": "Isolation Control Hospital (test tenant)",
         "primary": False,
@@ -60,28 +68,28 @@ DEPARTMENTS: tuple[dict[str, str], ...] = (
 # The seven roles of §5.2. Subjects match the Keycloak realm import so the OIDC
 # chain lines up without hand-editing either side.
 USERS: tuple[dict[str, Any], ...] = (
-    {"subject": "kc-nurse-genmed", "username": "nurse.genmed",
+    {"subject": "a0000001-0000-4000-8000-000000000001", "username": "nurse.genmed",
      "display_name": "Nurse Anitha Raman", "role": "nurse", "department": "GEN-MED",
      "mfa": False},
-    {"subject": "kc-nurse-ayush", "username": "nurse.ayush",
+    {"subject": "a0000002-0000-4000-8000-000000000002", "username": "nurse.ayush",
      "display_name": "Nurse Sujatha Nair", "role": "nurse", "department": "AYUSH-AYU",
      "mfa": False},
-    {"subject": "kc-physician-genmed", "username": "physician.genmed",
+    {"subject": "a0000003-0000-4000-8000-000000000003", "username": "physician.genmed",
      "display_name": "Dr Vikram Iyer", "role": "physician", "department": "GEN-MED",
      "mfa": True},
-    {"subject": "kc-physician-genmed-2", "username": "physician.genmed2",
+    {"subject": "a0000004-0000-4000-8000-000000000004", "username": "physician.genmed2",
      "display_name": "Dr Fatima Sheikh", "role": "physician", "department": "GEN-MED",
      "mfa": True},
-    {"subject": "kc-ayush-practitioner", "username": "practitioner.ayush",
+    {"subject": "a0000005-0000-4000-8000-000000000005", "username": "practitioner.ayush",
      "display_name": "Dr Meenakshi Pillai (BAMS)", "role": "ayush_practitioner",
      "department": "AYUSH-AYU", "mfa": True},
-    {"subject": "kc-clinical-admin", "username": "governance.admin",
+    {"subject": "a0000006-0000-4000-8000-000000000006", "username": "governance.admin",
      "display_name": "Dr R Krishnan (Clinical Governance)", "role": "clinical_admin",
      "department": None, "mfa": True},
-    {"subject": "kc-it-admin", "username": "it.admin",
+    {"subject": "a0000007-0000-4000-8000-000000000007", "username": "it.admin",
      "display_name": "S Prakash (IT Administrator)", "role": "it_admin",
      "department": None, "mfa": True},
-    {"subject": "kc-security-officer", "username": "security.officer",
+    {"subject": "a0000008-0000-4000-8000-000000000008", "username": "security.officer",
      "display_name": "L Menon (Security & Privacy Officer)", "role": "security_officer",
      "department": None, "mfa": True},
 )
@@ -119,13 +127,17 @@ async def seed(dsn: str, *, pin_checksums: bool) -> dict[str, Any]:
     try:
         async with conn.transaction():
             for tenant_spec in TENANTS:
+                # The id is FIXED, not generated: the Keycloak realm carries this
+                # uuid as a literal tenant_id claim, so a token must refer to the
+                # tenant this script creates.
                 tenant_id = await conn.fetchval(
                     """
-                    INSERT INTO tenant (slug, display_name)
-                    VALUES ($1, $2)
+                    INSERT INTO tenant (id, slug, display_name)
+                    VALUES ($1::uuid, $2, $3)
                     ON CONFLICT (slug) DO UPDATE SET display_name = EXCLUDED.display_name
                     RETURNING id
                     """,
+                    tenant_spec["id"],
                     tenant_spec["slug"],
                     tenant_spec["display_name"],
                 )
@@ -223,7 +235,7 @@ async def seed(dsn: str, *, pin_checksums: bool) -> dict[str, Any]:
                         """
                         INSERT INTO app_user (tenant_id, subject, username, display_name,
                                               role, assigned_department_id, mfa_enrolled)
-                        VALUES ($1, 'kc-physician-othertenant', 'physician.other',
+                        VALUES ($1, 'a0000009-0000-4000-8000-000000000009', 'physician.other',
                                 'Dr Other Tenant', 'physician', $2, true)
                         ON CONFLICT (subject) DO UPDATE
                            SET assigned_department_id = EXCLUDED.assigned_department_id

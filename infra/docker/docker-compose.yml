@@ -42,6 +42,9 @@ services:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      # Creates Keycloak's own schema at cluster init, so its ~90 tables never
+      # land in `public` alongside the clinical schema (§30).
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_SUPERUSER:-medikiosk_owner} -d ${POSTGRES_DB:-medikiosk}"]
       interval: 5s

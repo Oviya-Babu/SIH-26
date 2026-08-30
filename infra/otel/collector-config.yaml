@@ -1,0 +1,218 @@
+# =============================================================================
+# OpenTelemetry Collector — THE single PHI redaction choke point (CLAUDE.md §28).
+#
+# [RED LINE §28] The clinical database may contain necessary PHI under controlled
+# access. Operational telemetry never does.
+#
+# The application already redacts at the logger (allowlist + pattern sweep +
+# tenant-salted pseudonymisation). This collector is the SECOND, independent
+# layer: it sits between every service and every telemetry backend, so a service
+# that is misconfigured, a third-party library that logs a connection string, or
+# a future service written by someone who has not read §28 still cannot put an
+# identifier into Prometheus, Grafana or a trace store.
+#
+# Redaction here is deliberately AGGRESSIVE. Losing a span attribute costs an
+# engineer some context; leaking a patient identifier is a reportable incident.
+# =============================================================================
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  # --- 1. Drop attributes that must never exist in telemetry ----------------
+  attributes/strip_phi:
+    actions:
+      # Direct identifiers.
+      - key: patient_id
+        action: delete
+      - key: patient.id
+        action: delete
+      - key: patient_name
+        action: delete
+      - key: full_name
+        action: delete
+      - key: abha_reference
+        action: delete
+      - key: abha_address
+        action: delete
+      - key: aadhaar
+        action: delete
+      - key: aadhaar_number
+        action: delete
+      - key: phone
+        action: delete
+      - key: phone_number
+        action: delete
+      - key: email
+        action: delete
+      - key: address
+        action: delete
+      - key: date_of_birth
+        action: delete
+      - key: year_of_birth
+        action: delete
+      # Clinical content.
+      - key: value_raw
+        action: delete
+      - key: value_normalized
+        action: delete
+      - key: transcript
+        action: delete
+      - key: ocr_text
+        action: delete
+      - key: chief_complaint
+        action: delete
+      - key: staff_message
+        action: delete
+      - key: summary_text
+        action: delete
+      - key: answer
+        action: delete
+      # Credentials.
+      - key: authorization
+        action: delete
+      - key: token
+        action: delete
+      - key: access_token
+        action: delete
+      - key: password
+        action: delete
+      - key: api_key
+        action: delete
+      - key: secret
+        action: delete
+      - key: device_credential
+        action: delete
+      # HTTP attributes that commonly carry ids in the path or query.
+      - key: http.url
+        action: delete
+      - key: url.full
+        action: delete
+      - key: url.query
+        action: delete
+      - key: http.target
+        action: delete
+
+  # --- 2. Hash whatever identifier-shaped keys survive ---------------------
+  # Correlation is preserved (the same id hashes the same way) while the value
+  # stops being an identifier. Note: this is a hash, NOT the application's
+  # tenant-salted HMAC, so it is not reversible without the collector's own view.
+  attributes/hash_remaining:
+    actions:
+      - key: session_id
+        action: hash
+      - key: user_id
+        action: hash
+      - key: actor_id
+        action: hash
+      - key: document_id
+        action: hash
+      - key: fact_id
+        action: hash
+      - key: device_id
+        action: hash
+      - key: tenant_id
+        action: hash
+      - key: enduser.id
+        action: hash
+
+  # --- 3. Redact identifier-shaped VALUES anywhere they appear -------------
+  # Catches free text that no key-level rule would find: an exception message,
+  # a span name, a log body.
+  redaction/patterns:
+    allow_all_keys: true
+    blocked_values:
+      # Aadhaar-shaped: 12 digits beginning 2-9.
+      - '\b[2-9]\d{3}[ -]?\d{4}[ -]?\d{4}\b'
+      # ABHA address and 14-digit ABHA number.
+      - '\b[\w.\-]{3,}@(?i:abdm|sbx|ndhm)\b'
+      - '\b\d{2}-?\d{4}-?\d{4}-?\d{4}\b'
+      # Indian mobile numbers.
+      - '(?:\+?91[ -]?)?\b[6-9]\d{9}\b'
+      - '\b[\w.+\-]+@[\w\-]+\.[\w.\-]+\b'
+      # JWTs and bearer tokens.
+      - 'eyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{5,}'
+      - '(?i)bearer\s+[A-Za-z0-9._\-]{8,}'
+      # DSNs with embedded credentials.
+      - '(?i)(?:postgres(?:ql)?|amqp|redis)://[^\s"'']*:[^\s"''@]*@'
+      # Bare UUIDs in free text.
+      - '\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b'
+    summary: debug
+
+  # --- 4. Resource hygiene -------------------------------------------------
+  resource/scrub:
+    attributes:
+      - key: host.name
+        action: delete
+      - key: process.command_line
+        action: delete
+      - key: process.owner
+        action: delete
+
+  batch:
+    timeout: 5s
+    send_batch_size: 512
+
+  memory_limiter:
+    check_interval: 2s
+    limit_percentage: 75
+    spike_limit_percentage: 20
+
+exporters:
+  # Metrics for Prometheus to scrape.
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    resource_to_telemetry_conversion:
+      enabled: false
+
+  # Local development sink. A production deployment replaces this with the real
+  # trace/log backend — and the redaction pipeline above stays in front of it.
+  debug:
+    verbosity: normal
+    sampling_initial: 2
+    sampling_thereafter: 500
+
+service:
+  telemetry:
+    logs:
+      level: warn
+  pipelines:
+    # Every pipeline runs the SAME redaction chain, in the same order. A pipeline
+    # that skipped it would be the hole the whole control exists to prevent.
+    traces:
+      receivers: [otlp]
+      processors:
+        - memory_limiter
+        - attributes/strip_phi
+        - attributes/hash_remaining
+        - redaction/patterns
+        - resource/scrub
+        - batch
+      exporters: [debug]
+
+    metrics:
+      receivers: [otlp]
+      processors:
+        - memory_limiter
+        - attributes/strip_phi
+        - attributes/hash_remaining
+        - redaction/patterns
+        - resource/scrub
+        - batch
+      exporters: [prometheus, debug]
+
+    logs:
+      receivers: [otlp]
+      processors:
+        - memory_limiter
+        - attributes/strip_phi
+        - attributes/hash_remaining
+        - redaction/patterns
+        - resource/scrub
+        - batch
+      exporters: [debug]

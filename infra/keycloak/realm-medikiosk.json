@@ -1,0 +1,377 @@
+{
+  "realm": "medikiosk",
+  "enabled": true,
+  "displayName": "MediKiosk",
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": true,
+  "rememberMe": false,
+  "verifyEmail": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "maxFailureWaitSeconds": 900,
+  "failureFactor": 5,
+  "waitIncrementSeconds": 60,
+  "accessTokenLifespan": 900,
+  "accessTokenLifespanForImplicitFlow": 900,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 28800,
+  "offlineSessionIdleTimeout": 0,
+  "revokeRefreshToken": true,
+  "refreshTokenMaxReuse": 0,
+  "passwordPolicy": "length(12) and upperCase(1) and lowerCase(1) and digits(1) and specialChars(1) and notUsername(undefined)",
+  "roles": {
+    "realm": [
+      {
+        "name": "nurse",
+        "description": "Nurse / Triage. Red-flag queue for their own department only. No physician or admin actions (§5.2)."
+      },
+      {
+        "name": "physician",
+        "description": "Physician. Edit/reject/approve assigned sessions. MFA required. No post-export writes (§5.2)."
+      },
+      {
+        "name": "ayush_practitioner",
+        "description": "AYUSH practitioner. Physician authority plus NAMASTE/ICD-11 TM2 confirmation (§12, §24). MFA required."
+      },
+      {
+        "name": "clinical_admin",
+        "description": "Clinical Governance. Protocol and red-flag review queue. NO clinical record access; changes route through the CI gate (§5.2). MFA required."
+      },
+      {
+        "name": "it_admin",
+        "description": "IT Admin. Own-tenant device/user/integration config. NO clinical data. MFA required (§5.2)."
+      },
+      {
+        "name": "security_officer",
+        "description": "Security & Privacy Officer. Audit export (step-up MFA), consent and retention status. NO clinical editing (§5.2)."
+      },
+      {
+        "name": "caregiver_respondent",
+        "description": "Reserved. Caregivers are NOT Keycloak identities in this design — they hold an ephemeral kiosk token (§4). Present so the role name is never reused for something else."
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "medikiosk-staff",
+      "name": "MediKiosk Staff Workspace",
+      "description": "The Nurse/Physician/Admin frontend. Public client using authorization code + PKCE — a browser app must never hold a client secret.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:3200/*",
+        "http://127.0.0.1:3200/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3200",
+        "http://127.0.0.1:3200"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:3200/*",
+        "access.token.lifespan": "900"
+      },
+      "protocolMappers": [
+        {
+          "name": "tenant-id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "tenant_id",
+            "claim.name": "tenant_id",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "audience-staff",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "medikiosk-staff",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ],
+  "authenticationFlows": [
+    {
+      "alias": "medikiosk-browser-mfa",
+      "description": "Browser flow requiring OTP for privileged roles (§27)",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "auth-cookie",
+          "requirement": "ALTERNATIVE",
+          "priority": 10,
+          "userSetupAllowed": false,
+          "autheticatorFlow": false
+        },
+        {
+          "flowAlias": "medikiosk-forms",
+          "requirement": "ALTERNATIVE",
+          "priority": 20,
+          "userSetupAllowed": false,
+          "autheticatorFlow": true
+        }
+      ]
+    },
+    {
+      "alias": "medikiosk-forms",
+      "description": "Username/password followed by a mandatory OTP",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "auth-username-password-form",
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false,
+          "autheticatorFlow": false
+        },
+        {
+          "authenticator": "auth-otp-form",
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "userSetupAllowed": true,
+          "autheticatorFlow": false
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "nurse.genmed",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "nurse.genmed@example.invalid",
+      "firstName": "Anitha",
+      "lastName": "Raman",
+      "attributes": {
+        "tenant_id": [
+          "11111111-1111-1111-1111-111111111111"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Nurse!GenMed2026",
+          "temporary": true
+        }
+      ],
+      "realmRoles": [
+        "nurse"
+      ],
+      "id": "a0000001-0000-4000-8000-000000000001"
+    },
+    {
+      "username": "nurse.ayush",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "nurse.ayush@example.invalid",
+      "firstName": "Sujatha",
+      "lastName": "Nair",
+      "attributes": {
+        "tenant_id": [
+          "11111111-1111-1111-1111-111111111111"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Nurse!Ayush2026",
+          "temporary": true
+        }
+      ],
+      "realmRoles": [
+        "nurse"
+      ],
+      "id": "a0000002-0000-4000-8000-000000000002"
+    },
+    {
+      "username": "physician.genmed",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "physician.genmed@example.invalid",
+      "firstName": "Vikram",
+      "lastName": "Iyer",
+      "attributes": {
+        "tenant_id": [
+          "11111111-1111-1111-1111-111111111111"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Physician!GenMed2026",
+          "temporary": true
+        }
+      ],
+      "realmRoles": [
+        "physician"
+      ],
+      "id": "a0000003-0000-4000-8000-000000000003"
+    },
+    {
+      "username": "physician.genmed2",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "physician.genmed2@example.invalid",
+      "firstName": "Fatima",
+      "lastName": "Sheikh",
+      "attributes": {
+        "tenant_id": [
+          "11111111-1111-1111-1111-111111111111"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Physician!Second2026",
+          "temporary": true
+        }
+      ],
+      "realmRoles": [
+        "physician"
+      ],
+      "id": "a0000004-0000-4000-8000-000000000004"
+    },
+    {
+      "username": "practitioner.ayush",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "practitioner.ayush@example.invalid",
+      "firstName": "Meenakshi",
+      "lastName": "Pillai",
+      "attributes": {
+        "tenant_id": [
+          "11111111-1111-1111-1111-111111111111"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Ayush!Practice2026",
+          "temporary": true
+        }
+      ],
+      "realmRoles": [
+        "ayush_practitioner"
+      ],
+      "id": "a0000005-0000-4000-8000-000000000005"
+    },
+    {
+      "username": "governance.admin",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "governance.admin@example.invalid",
+      "firstName": "R",
+      "lastName": "Krishnan",
+      "attributes": {
+        "tenant_id": [
+          "11111111-1111-1111-1111-111111111111"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Governance!Admin2026",
+          "temporary": true
+        }
+      ],
+      "realmRoles": [
+        "clinical_admin"
+      ],
+      "id": "a0000006-0000-4000-8000-000000000006"
+    },
+    {
+      "username": "it.admin",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "it.admin@example.invalid",
+      "firstName": "S",
+      "lastName": "Prakash",
+      "attributes": {
+        "tenant_id": [
+          "11111111-1111-1111-1111-111111111111"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "ItAdmin!Config2026",
+          "temporary": true
+        }
+      ],
+      "realmRoles": [
+        "it_admin"
+      ],
+      "id": "a0000007-0000-4000-8000-000000000007"
+    },
+    {
+      "username": "security.officer",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "security.officer@example.invalid",
+      "firstName": "L",
+      "lastName": "Menon",
+      "attributes": {
+        "tenant_id": [
+          "11111111-1111-1111-1111-111111111111"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Security!Officer2026",
+          "temporary": true
+        }
+      ],
+      "realmRoles": [
+        "security_officer"
+      ],
+      "id": "a0000008-0000-4000-8000-000000000008"
+    },
+    {
+      "username": "physician.other",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "physician.other@example.invalid",
+      "firstName": "Other",
+      "lastName": "Tenant",
+      "attributes": {
+        "tenant_id": [
+          "22222222-2222-2222-2222-222222222222"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Physician!Other2026",
+          "temporary": true
+        }
+      ],
+      "realmRoles": [
+        "physician"
+      ],
+      "id": "a0000009-0000-4000-8000-000000000009"
+    }
+  ]
+}
