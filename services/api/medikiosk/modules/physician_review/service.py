@@ -24,7 +24,7 @@ from uuid import UUID, uuid4
 
 import asyncpg
 
-from medikiosk.db import Principal, as_json
+from medikiosk.db import Principal, to_jsonb
 from medikiosk.errors import Conflict, NotFound, ValidationFailed
 from medikiosk.modules.audit import service as audit
 from medikiosk.observability.logging_setup import get_logger
@@ -282,7 +282,7 @@ async def approve(
             tenant_id,
             "ClinicalSummaryApproved",
             session_id,
-            as_json(
+            to_jsonb(
                 {
                     "target": target,
                     "session_id": str(session_id),

@@ -176,6 +176,14 @@ PATIENT_DATA_TABLES: Sequence[str] = (
 
 
 async def _init_connection(conn: asyncpg.Connection) -> None:
+    """Register the jsonb codec.
+
+    With this codec registered, ``jsonb`` parameters must be passed as PYTHON
+    OBJECTS — asyncpg calls the encoder itself. Passing a pre-serialised string
+    double-encodes it into a jsonb *string*, which reads back as a string and
+    silently breaks every predicate that expects an object. Use
+    :func:`to_jsonb` at call sites so the intent is explicit.
+    """
     await conn.set_type_codec(
         "jsonb",
         encoder=json.dumps,
@@ -200,4 +208,20 @@ async def _apply_principal(conn: asyncpg.Connection, principal: Principal) -> No
 
 
 def as_json(value: Any) -> str:
+    """Serialise to a JSON STRING.
+
+    For message-broker bodies and file payloads — NOT for jsonb parameters. See
+    :func:`to_jsonb`.
+    """
     return json.dumps(value, separators=(",", ":"), sort_keys=True, default=str)
+
+
+def to_jsonb(value: Any) -> Any:
+    """Prepare a value for a ``jsonb`` query parameter.
+
+    Passes the object through, after a round-trip that applies ``default=str``
+    so a UUID or datetime nested in a payload cannot raise inside asyncpg's
+    encoder — where the failure would surface as an opaque serialisation error
+    mid-transaction rather than at the call site.
+    """
+    return json.loads(as_json(value))

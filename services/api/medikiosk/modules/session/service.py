@@ -21,7 +21,7 @@ from uuid import UUID
 
 import asyncpg
 
-from medikiosk.db import Principal, as_json
+from medikiosk.db import Principal, to_jsonb
 from medikiosk.errors import Conflict, NotFound, SessionSealed, ValidationFailed
 from medikiosk.modules.audit import service as audit
 from medikiosk.modules.clinical_facts import service as facts
@@ -449,7 +449,7 @@ async def submit_answer(
         session.id,
         field_id,
         asr_transcript,
-        as_json(normalized),
+        to_jsonb(normalized),
         input_method,
         confidence,
         confirmed or verdict is ConfidenceVerdict.ACCEPT,
@@ -581,12 +581,11 @@ async def _record_skip(
         INSERT INTO session_answer
             (tenant_id, session_id, field_id, value_normalized, input_method, confidence,
              confirmed, respondent_type, respondent_id, respondent_relationship, skip_reason)
-        VALUES ($1, $2, $3, $4::jsonb, $5, 1.0, true, $6, $7, $8, $9)
+        VALUES ($1, $2, $3, 'null'::jsonb, $4, 1.0, true, $5, $6, $7, $8)
         """,
         principal.tenant_id,
         session.id,
         field.id,
-        as_json(None),
         input_method,
         session.respondent_type,
         respondent_id,
@@ -651,7 +650,7 @@ async def _engage_fast_path(
             INSERT INTO session_answer
                 (tenant_id, session_id, field_id, value_normalized, input_method,
                  confidence, confirmed, respondent_type, respondent_id, skip_reason)
-            VALUES ($1, $2, $3, $4::jsonb, 'touch', 1.0, false, 'staff', $5,
+            VALUES ($1, $2, $3, 'null'::jsonb, 'touch', 1.0, false, 'staff', $4,
                     'not_asked_due_to_emergency_escalation')
             ON CONFLICT DO NOTHING
             """,
@@ -660,7 +659,6 @@ async def _engage_fast_path(
                     principal.tenant_id,
                     session.id,
                     field_id,
-                    as_json(None),
                     principal.actor_id or session.patient_id,
                 )
                 for field_id in outstanding

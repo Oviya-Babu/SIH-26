@@ -25,7 +25,7 @@ from uuid import UUID
 
 import asyncpg
 
-from medikiosk.db import Principal, as_json
+from medikiosk.db import Principal, to_jsonb
 from medikiosk.errors import Conflict, NotFound
 from medikiosk.modules.audit import service as audit
 from medikiosk.modules.clinical_protocol.model import Protocol
@@ -133,7 +133,7 @@ async def evaluate_and_persist(
                 result.ruleset_version,
                 e.rule_id,
                 e.fired,
-                as_json(e.evaluated_state),
+                to_jsonb(e.evaluated_state),
                 trigger_field_id,
             )
             for e in result.evaluations
