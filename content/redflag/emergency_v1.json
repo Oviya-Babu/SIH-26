@@ -1,0 +1,427 @@
+{
+  "$comment": [
+    "MediKiosk governed red-flag ruleset — emergency_v1 (CLAUDE.md §14).",
+    "",
+    "CONSERVATIVE, HIGH-SENSITIVITY BY DESIGN. In an OPD triage context a false",
+    "positive costs a nurse a look; a false negative can cost a life. Rules are",
+    "therefore written to over-trigger rather than under-trigger, and every",
+    "evaluation — fired or not — is persisted so the real rates can be measured",
+    "on pilot data instead of asserted.",
+    "",
+    "NO PATIENT-FACING TEXT. The kiosk shows a calm, icon-based, audio-narrated",
+    "screen resolved from the localized kiosk bundle; 'staff_rationale' is",
+    "clinician-facing only and never rendered to a patient (§14).",
+    "",
+    "severity semantics:",
+    "  critical -> nurse alert + AMPLE fast path + session escalated_to_staff",
+    "  high     -> nurse alert, interview continues",
+    "  moderate -> logged and surfaced to the physician; no nurse page",
+    "",
+    "Any change to this file requires the clinical-safety-reviewer agent and must",
+    "pass the red-flag regression suite, system-wide, on every PR (§52, §59, §61)."
+  ],
+  "version": "emergency_v1",
+  "governance": {
+    "authored_by": "Clinical Governance Board",
+    "review_state": "prototype_pending_board_ratification",
+    "calibration_status": "UNCALIBRATED — thresholds and sensitivity are placeholders until pilot data exists (§53)"
+  },
+
+  "rules": [
+    {
+      "id": "rf.acs.crushing_central_chest_pain",
+      "name": "Possible acute coronary syndrome — crushing or pressing central/left chest pain",
+      "severity": "critical",
+      "sla_seconds": 180,
+      "category": "cardiac",
+      "reference": "Chest pain of crushing/pressing character in a central or left-sided distribution is the classic ACS presentation and mandates immediate assessment.",
+      "staff_rationale": "Chest pain described as crushing or pressing, located centrally or on the left. Pattern consistent with possible acute coronary syndrome. Immediate triage assessment and ECG required.",
+      "input_fields": ["gm.cc.primary_complaint", "gm.hpi.character", "gm.hpi.site"],
+      "predicate": {
+        "op": "and",
+        "args": [
+          { "op": "equals", "field": "gm.cc.primary_complaint", "value": "chest_pain" },
+          {
+            "op": "or",
+            "args": [
+              { "op": "contains", "field": "gm.hpi.character", "value": "crushing" },
+              { "op": "contains", "field": "gm.hpi.character", "value": "pressing" }
+            ]
+          },
+          {
+            "op": "or",
+            "args": [
+              { "op": "contains", "field": "gm.hpi.site", "value": "chest_center" },
+              { "op": "contains", "field": "gm.hpi.site", "value": "chest_left" }
+            ]
+          }
+        ]
+      },
+      "active": true
+    },
+    {
+      "id": "rf.acs.chest_pain_with_radiation",
+      "name": "Possible acute coronary syndrome — chest pain radiating to arm or jaw",
+      "severity": "critical",
+      "sla_seconds": 180,
+      "category": "cardiac",
+      "reference": "Radiation to the left arm or jaw is an independent high-specificity ACS feature.",
+      "staff_rationale": "Chest pain radiating to the arm or jaw. Independent ACS indicator; immediate triage assessment and ECG required.",
+      "input_fields": ["gm.cc.primary_complaint", "gm.hpi.radiation"],
+      "predicate": {
+        "op": "and",
+        "args": [
+          { "op": "equals", "field": "gm.cc.primary_complaint", "value": "chest_pain" },
+          {
+            "op": "in",
+            "field": "gm.hpi.radiation",
+            "values": ["left_arm", "right_arm", "jaw"]
+          }
+        ]
+      },
+      "active": true
+    },
+    {
+      "id": "rf.acs.chest_pain_autonomic_features",
+      "name": "Chest pain with breathlessness, cold sweating or fainting",
+      "severity": "critical",
+      "sla_seconds": 180,
+      "category": "cardiac",
+      "reference": "Autonomic features accompanying chest pain widen the differential to ACS, pulmonary embolism, aortic dissection and pneumothorax — all time-critical.",
+      "staff_rationale": "Chest pain with autonomic features (breathlessness, cold sweating, or fainting). Differential includes ACS, pulmonary embolism, aortic dissection, pneumothorax. Urgent triage required.",
+      "input_fields": ["gm.cc.primary_complaint", "gm.hpi.associated_symptoms"],
+      "predicate": {
+        "op": "and",
+        "args": [
+          { "op": "equals", "field": "gm.cc.primary_complaint", "value": "chest_pain" },
+          {
+            "op": "in",
+            "field": "gm.hpi.associated_symptoms",
+            "values": ["breathlessness", "cold_sweating", "fainting"]
+          }
+        ]
+      },
+      "active": true
+    },
+    {
+      "id": "rf.aortic.tearing_pain",
+      "name": "Tearing pain — possible aortic dissection",
+      "severity": "critical",
+      "sla_seconds": 180,
+      "category": "vascular",
+      "reference": "Tearing or ripping pain, particularly radiating to the back, is the characteristic descriptor of aortic dissection.",
+      "staff_rationale": "Pain described as tearing. Possible aortic dissection — do not delay for routine intake. Immediate senior assessment required.",
+      "input_fields": ["gm.hpi.character"],
+      "predicate": {
+        "op": "contains",
+        "field": "gm.hpi.character",
+        "value": "tearing"
+      },
+      "active": true
+    },
+    {
+      "id": "rf.stroke.fast_positive",
+      "name": "Possible acute stroke — one-sided weakness, speech or vision change",
+      "severity": "critical",
+      "sla_seconds": 120,
+      "category": "neurological",
+      "reference": "Sudden focal neurological deficit is time-critical; thrombolysis windows are measured in minutes.",
+      "staff_rationale": "Sudden one-sided weakness, speech difficulty, or vision change reported. Possible acute stroke — activate the stroke pathway and record time of onset immediately.",
+      "input_fields": ["gm.hpi.associated_symptoms", "gm.ros.neurological"],
+      "predicate": {
+        "op": "or",
+        "args": [
+          {
+            "op": "in",
+            "field": "gm.hpi.associated_symptoms",
+            "values": ["weakness_one_side", "speech_difficulty", "vision_change"]
+          },
+          {
+            "op": "in",
+            "field": "gm.ros.neurological",
+            "values": ["sudden_confusion"]
+          }
+        ]
+      },
+      "active": true
+    },
+    {
+      "id": "rf.neuro.thunderclap_headache",
+      "name": "Worst-ever headache or headache with neck stiffness",
+      "severity": "critical",
+      "sla_seconds": 180,
+      "category": "neurological",
+      "reference": "Thunderclap headache suggests subarachnoid haemorrhage; headache with neck stiffness suggests meningitis.",
+      "staff_rationale": "Worst-ever headache and/or neck stiffness reported. Differential includes subarachnoid haemorrhage and meningitis. Immediate assessment required.",
+      "input_fields": ["gm.ros.neurological"],
+      "predicate": {
+        "op": "in",
+        "field": "gm.ros.neurological",
+        "values": ["worst_headache_ever", "neck_stiffness"]
+      },
+      "active": true
+    },
+    {
+      "id": "rf.neuro.seizure_or_loc",
+      "name": "Seizure or loss of consciousness",
+      "severity": "critical",
+      "sla_seconds": 180,
+      "category": "neurological",
+      "reference": "A first seizure or any loss of consciousness requires assessment before the patient waits in a queue.",
+      "staff_rationale": "Seizure or loss of consciousness reported. Patient must not be left unattended in the waiting area. Immediate assessment required.",
+      "input_fields": ["gm.ros.neurological"],
+      "predicate": {
+        "op": "in",
+        "field": "gm.ros.neurological",
+        "values": ["fits_or_seizures", "loss_of_consciousness"]
+      },
+      "active": true
+    },
+    {
+      "id": "rf.resp.severe_dyspnoea",
+      "name": "Severe respiratory distress",
+      "severity": "critical",
+      "sla_seconds": 120,
+      "category": "respiratory",
+      "reference": "Breathlessness as the presenting complaint with high reported severity indicates respiratory compromise.",
+      "staff_rationale": "Breathlessness as presenting complaint with severity 8/10 or above. Assess airway, saturation and respiratory rate immediately.",
+      "input_fields": ["gm.cc.primary_complaint", "gm.hpi.severity"],
+      "predicate": {
+        "op": "and",
+        "args": [
+          { "op": "equals", "field": "gm.cc.primary_complaint", "value": "breathlessness" },
+          { "op": "gte", "field": "gm.hpi.severity", "value": 8 }
+        ]
+      },
+      "active": true
+    },
+    {
+      "id": "rf.resp.orthopnoea",
+      "name": "Breathlessness lying flat",
+      "severity": "high",
+      "sla_seconds": 600,
+      "category": "respiratory",
+      "reference": "Orthopnoea is a cardinal feature of decompensated heart failure.",
+      "staff_rationale": "Breathlessness when lying flat. Suggests decompensated heart failure or significant fluid overload. Prioritise for assessment.",
+      "input_fields": ["gm.ros.cardiorespiratory"],
+      "predicate": {
+        "op": "contains",
+        "field": "gm.ros.cardiorespiratory",
+        "value": "breathless_lying_flat"
+      },
+      "active": true
+    },
+    {
+      "id": "rf.resp.haemoptysis",
+      "name": "Coughing blood",
+      "severity": "high",
+      "sla_seconds": 600,
+      "category": "respiratory",
+      "reference": "Haemoptysis warrants prompt evaluation for tuberculosis, malignancy and pulmonary embolism — all with public-health or time-critical implications in this setting.",
+      "staff_rationale": "Haemoptysis reported. Evaluate for tuberculosis (with appropriate infection precautions), malignancy and pulmonary embolism.",
+      "input_fields": ["gm.hpi.associated_symptoms"],
+      "predicate": {
+        "op": "contains",
+        "field": "gm.hpi.associated_symptoms",
+        "value": "coughing_blood"
+      },
+      "active": true
+    },
+    {
+      "id": "rf.gi.upper_or_lower_gi_bleed",
+      "name": "Gastrointestinal bleeding",
+      "severity": "critical",
+      "sla_seconds": 180,
+      "category": "gastrointestinal",
+      "reference": "Haematemesis or melaena indicates active GI bleeding with risk of rapid haemodynamic deterioration.",
+      "staff_rationale": "Vomiting blood and/or black or bloody stool reported. Active gastrointestinal bleeding — check haemodynamics now and secure IV access.",
+      "input_fields": ["gm.ros.gastrointestinal"],
+      "predicate": {
+        "op": "in",
+        "field": "gm.ros.gastrointestinal",
+        "values": ["vomiting_blood", "black_or_bloody_stool"]
+      },
+      "active": true
+    },
+    {
+      "id": "rf.anaphylaxis.airway_or_collapse",
+      "name": "Allergy history with airway swelling or collapse",
+      "severity": "critical",
+      "sla_seconds": 120,
+      "category": "allergy",
+      "reference": "A documented reaction involving facial/lip swelling, breathing difficulty or collapse indicates prior anaphylaxis and a high re-exposure risk.",
+      "staff_rationale": "Reported allergic reaction involving airway swelling, breathing difficulty or collapse — prior anaphylaxis. Flag prominently before any drug administration and confirm the culprit agent.",
+      "input_fields": ["gm.allergy.reaction"],
+      "predicate": {
+        "op": "in",
+        "field": "gm.allergy.reaction",
+        "values": ["swelling_of_face_or_lips", "difficulty_breathing", "collapse_or_fainting"]
+      },
+      "active": true
+    },
+    {
+      "id": "rf.pain.severe_uncontrolled",
+      "name": "Severe pain",
+      "severity": "high",
+      "sla_seconds": 300,
+      "category": "pain_management",
+      "reference": "Self-reported severity of 8 or more warrants prompt analgesia review irrespective of cause.",
+      "staff_rationale": "Patient reports severity 8/10 or above. Prompt analgesia review required irrespective of underlying cause.",
+      "input_fields": ["gm.hpi.severity"],
+      "predicate": {
+        "op": "gte",
+        "field": "gm.hpi.severity",
+        "value": 8
+      },
+      "active": true
+    },
+    {
+      "id": "rf.pain.sudden_severe_onset",
+      "name": "Sudden severe onset",
+      "severity": "high",
+      "sla_seconds": 300,
+      "category": "general",
+      "reference": "An abrupt, maximal-at-onset presentation is characteristic of vascular catastrophes.",
+      "staff_rationale": "Symptom described as sudden and severe at onset. Abrupt maximal-at-onset presentations are characteristic of vascular events; do not defer assessment.",
+      "input_fields": ["gm.hpi.time_course"],
+      "predicate": {
+        "op": "equals",
+        "field": "gm.hpi.time_course",
+        "value": "sudden_and_severe"
+      },
+      "active": true
+    },
+    {
+      "id": "rf.renal.anuria_or_haematuria",
+      "name": "Reduced urine output or blood in urine",
+      "severity": "high",
+      "sla_seconds": 600,
+      "category": "renal",
+      "reference": "Oliguria suggests acute kidney injury or obstruction; frank haematuria requires prompt evaluation.",
+      "staff_rationale": "Reduced urine output and/or blood in urine. Evaluate for acute kidney injury, obstruction or urological pathology.",
+      "input_fields": ["gm.ros.genitourinary"],
+      "predicate": {
+        "op": "in",
+        "field": "gm.ros.genitourinary",
+        "values": ["reduced_urine", "blood_in_urine"]
+      },
+      "active": true
+    },
+    {
+      "id": "rf.constitutional.weight_loss_red_flag",
+      "name": "Unexplained weight loss",
+      "severity": "high",
+      "sla_seconds": 900,
+      "category": "constitutional",
+      "reference": "Weight loss with night sweats or persistent fever is a recognised indicator of tuberculosis or malignancy, both prevalent in this population.",
+      "staff_rationale": "Unexplained weight loss with night sweats and/or persistent fever. Evaluate for tuberculosis and malignancy; consider infection precautions.",
+      "input_fields": ["gm.ros.constitutional"],
+      "predicate": {
+        "op": "and",
+        "args": [
+          { "op": "contains", "field": "gm.ros.constitutional", "value": "weight_loss" },
+          {
+            "op": "in",
+            "field": "gm.ros.constitutional",
+            "values": ["night_sweats", "persistent_fever"]
+          }
+        ]
+      },
+      "active": true
+    },
+    {
+      "id": "rf.medication.self_discontinued",
+      "name": "Patient stopped prescribed medication on their own",
+      "severity": "moderate",
+      "sla_seconds": 1800,
+      "category": "medication_safety",
+      "reference": "Self-discontinuation of chronic therapy is a common and correctable cause of decompensation.",
+      "staff_rationale": "Patient reports stopping prescribed medication without medical advice. Establish which medicine, for how long, and why, before prescribing.",
+      "input_fields": ["gm.med.adherence"],
+      "predicate": {
+        "op": "equals",
+        "field": "gm.med.adherence",
+        "value": "stopped_on_my_own"
+      },
+      "active": true
+    },
+    {
+      "id": "rf.medication.allergy_with_active_medication",
+      "name": "Documented allergy alongside active medication",
+      "severity": "moderate",
+      "sla_seconds": 1800,
+      "category": "medication_safety",
+      "reference": "Co-existing allergy and active polypharmacy is the highest-yield point to check for a contraindicated agent already in use.",
+      "staff_rationale": "Patient has a documented allergy AND is taking medication. Verify no contraindicated agent is currently in use before prescribing.",
+      "input_fields": ["gm.allergy.has_allergy", "gm.med.taking_medicines"],
+      "predicate": {
+        "op": "and",
+        "args": [
+          { "op": "equals", "field": "gm.allergy.has_allergy", "value": "yes" },
+          {
+            "op": "in",
+            "field": "gm.med.taking_medicines",
+            "values": ["yes_regularly", "yes_sometimes"]
+          }
+        ]
+      },
+      "active": true
+    },
+    {
+      "id": "rf.cardiac.exertional_pattern",
+      "name": "Symptom brought on by exertion",
+      "severity": "high",
+      "sla_seconds": 600,
+      "category": "cardiac",
+      "reference": "An exertional trigger is the defining feature of stable angina and of exertional dyspnoea from cardiac cause.",
+      "staff_rationale": "Symptom triggered by physical exertion. Suggests an ischaemic or cardiac-limitation pattern; assess before the patient is asked to walk or wait standing.",
+      "input_fields": ["gm.hpi.exacerbating", "gm.cc.primary_complaint"],
+      "predicate": {
+        "op": "and",
+        "args": [
+          { "op": "contains", "field": "gm.hpi.exacerbating", "value": "physical_exertion" },
+          {
+            "op": "in",
+            "field": "gm.cc.primary_complaint",
+            "values": ["chest_pain", "breathlessness", "dizziness", "weakness_fatigue"]
+          }
+        ]
+      },
+      "active": true
+    },
+    {
+      "id": "rf.ayush.severe_debility",
+      "name": "Severe debility on AYUSH assessment",
+      "severity": "high",
+      "sla_seconds": 900,
+      "category": "constitutional",
+      "reference": "Very poor Bala with absent Ahara Shakti indicates a patient too depleted for routine outpatient throughput, irrespective of system of medicine.",
+      "staff_rationale": "AYUSH intake indicates very weak strength and/or complete loss of appetite. Patient is significantly depleted — assess hydration and nutrition before routine consultation.",
+      "input_fields": ["ay.dv.sara.stamina", "ay.dv.ahara_shakti.capacity"],
+      "predicate": {
+        "op": "or",
+        "args": [
+          { "op": "equals", "field": "ay.dv.sara.stamina", "value": "very_weak" },
+          { "op": "equals", "field": "ay.dv.ahara_shakti.capacity", "value": "no_appetite_at_all" }
+        ]
+      },
+      "active": true
+    },
+    {
+      "id": "rf.ayush.exertional_intolerance",
+      "name": "Cannot exert at all — AYUSH Vyayama Shakti",
+      "severity": "high",
+      "sla_seconds": 900,
+      "category": "cardiac",
+      "reference": "Breathlessness on mild exertion or complete exertional intolerance is a cardiorespiratory finding regardless of the department the patient walked into.",
+      "staff_rationale": "AYUSH intake reports breathlessness on mild exertion or complete inability to exert. Cardiorespiratory assessment indicated alongside the AYUSH consultation.",
+      "input_fields": ["ay.dv.vyayama_shakti.capacity"],
+      "predicate": {
+        "op": "in",
+        "field": "ay.dv.vyayama_shakti.capacity",
+        "values": ["breathless_on_mild_exertion", "cannot_exert_at_all"]
+      },
+      "active": true
+    }
+  ]
+}

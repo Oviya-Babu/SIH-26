@@ -1,0 +1,255 @@
+{
+  "$comment": [
+    "Kiosk chrome strings. Consumed by apps/kiosk-frontend through the API's",
+    "/v1/kiosk/i18n endpoint, so the frontend ships no hardcoded copy (§8).",
+    "",
+    "Voice keys ending in '_spoken' are TTS scripts: longer, conversational, and",
+    "read aloud automatically. The matching on-screen key is short, because a",
+    "kiosk header at large type has room for very few words (§1)."
+  ],
+
+  "app": {
+    "name": "MediKiosk",
+    "tagline": "Tell us about your health before you see the doctor"
+  },
+
+  "welcome": {
+    "title": "Welcome",
+    "subtitle": "Touch the screen to begin",
+    "start": "Start",
+    "start_spoken": "Welcome. Touch the large green button on the screen to begin. If you need help at any time, touch the help button, and a member of staff will come to you.",
+    "staff_help": "I need help",
+    "assisted_by_caregiver": "I am helping someone else",
+    "free_and_private": "This is free, and your information is private",
+    "takes_minutes": "This takes about {minutes} minutes"
+  },
+
+  "language": {
+    "title": "Choose your language",
+    "title_spoken": "Please choose the language you are most comfortable with. Touch your language on the screen.",
+    "change": "Change language",
+    "confirm": "Continue in {language}",
+    "listen_sample": "Listen"
+  },
+
+  "department": {
+    "title": "Which department are you visiting?",
+    "title_spoken": "Which department are you visiting today? Touch the one you have come for.",
+    "general_medicine": "General Medicine",
+    "ayush_ayurveda": "Ayurveda (AYUSH)",
+    "fixed_by_device": "This kiosk is set up for {department}"
+  },
+
+  "identity": {
+    "title": "Let us identify you",
+    "title_spoken": "First, let us identify you. If you have an ABHA health card, you can scan it. If you do not have one, that is completely fine — we can register you here.",
+    "has_abha": "I have an ABHA card",
+    "scan_abha": "Scan your ABHA QR code",
+    "scan_abha_spoken": "Hold your ABHA card in front of the camera, with the square code facing the screen.",
+    "no_abha": "I do not have an ABHA card",
+    "no_abha_is_fine": "You do not need an ABHA card to be seen today",
+    "register_here": "Register here",
+    "create_abha": "I want to create an ABHA card",
+    "create_abha_note": "You will be taken to the Government's own ABHA service to create it. We never see or store your Aadhaar number.",
+    "full_name": "Your name",
+    "year_of_birth": "Year of birth",
+    "age": "Age",
+    "gender": "Gender",
+    "gender_male": "Male",
+    "gender_female": "Female",
+    "gender_other": "Other",
+    "gender_undisclosed": "Prefer not to say",
+    "phone_last4": "Last 4 digits of your phone number",
+    "phone_last4_help": "We only ask for the last 4 digits, so the hospital can match your record.",
+    "existing_record_found": "We found your record",
+    "existing_record_note": "Please check that this is you",
+    "not_me": "This is not me",
+    "yes_this_is_me": "Yes, this is me"
+  },
+
+  "consent": {
+    "title": "Your permission",
+    "listen_full": "Listen to the full explanation",
+    "listen_again": "Listen again",
+    "read_instead": "Read it instead",
+    "i_agree": "I agree",
+    "i_do_not_agree": "I do not agree",
+    "agree_and_continue": "I understand and agree",
+    "each_separately": "You can agree to each one separately",
+    "required_note": "The first permission is needed to continue. The others are your choice.",
+    "declined_title": "That is your right",
+    "declined_body": "You have not given permission, so we will not continue here. Please go to the registration counter and a staff member will help you in person.",
+    "withdraw_anytime": "You can withdraw your permission at any time",
+    "withdraw": "Withdraw a permission"
+  },
+
+  "caregiver": {
+    "title": "Who is answering the questions?",
+    "title_spoken": "Who will answer the questions? If you are helping the patient, please tell us, so the doctor knows.",
+    "patient_self": "The patient is answering",
+    "caregiver_answering": "I am answering for the patient",
+    "relationship": "Your relationship to the patient",
+    "relationship_spouse": "Husband or wife",
+    "relationship_parent": "Parent",
+    "relationship_child": "Son or daughter",
+    "relationship_sibling": "Brother or sister",
+    "relationship_other_relative": "Other relative",
+    "relationship_friend": "Friend or neighbour",
+    "relationship_attendant": "Paid attendant",
+    "your_name": "Your name",
+    "patient_ack_title": "A question for the patient",
+    "patient_ack_spoken": "This question is for the patient. Is it all right if this person answers the questions on your behalf? Please answer yourself, by voice or by touching the screen.",
+    "patient_ack_yes": "Yes, they may answer for me",
+    "patient_ack_no": "No, I will answer myself",
+    "patient_cannot_respond": "The patient is unable to answer at all",
+    "staff_required_title": "A staff member must help with this",
+    "staff_required_body": "When a patient cannot answer at all, a staff member has to record this with a document. Please go to the counter — we have saved nothing yet.",
+    "recorded_as": "Answers will be marked as reported by {name} ({relationship})"
+  },
+
+  "interview": {
+    "question_of": "Question {current} of about {total}",
+    "section": "Section",
+    "progress": "You have completed {percent} per cent",
+    "listen": "Listen to the question",
+    "repeat": "Say it again",
+    "speak_answer": "Speak your answer",
+    "listening": "Listening…",
+    "listening_spoken": "I am listening. Please speak now.",
+    "stop_listening": "Stop",
+    "processing": "One moment…",
+    "use_touch_instead": "Answer by touching instead",
+    "use_voice_instead": "Answer by speaking instead",
+    "back": "Go back",
+    "next": "Next",
+    "skip": "I do not know",
+    "skip_confirm": "Mark this as 'I do not know'?",
+    "declined": "I prefer not to answer",
+    "help": "Help",
+    "choose_one": "Choose one",
+    "choose_all": "Choose all that apply",
+    "chosen_count": "{count} chosen",
+    "clear_selection": "Clear",
+    "type_here": "Type here",
+    "confirm_title": "Let me check I understood",
+    "confirm_yes": "Yes, that is right",
+    "confirm_no": "No, let me answer again",
+    "not_understood": "I did not catch that",
+    "not_understood_spoken": "I am sorry, I did not catch that. Please try again, or answer by touching the screen.",
+    "voice_unavailable_title": "Voice is not working right now",
+    "voice_unavailable_body": "Please answer by touching the screen. Nothing you have told us is lost.",
+    "answer_saved": "Saved",
+    "call_staff": "Call a staff member"
+  },
+
+  "escalation": {
+    "$comment": "Shown when a critical red flag fires. Calm, icon-based, never technical, never a diagnosis (§14).",
+    "title": "Thank you",
+    "body": "A nurse is coming to help you now. Please stay seated.",
+    "body_spoken": "Thank you. A nurse is coming to help you right now. Please stay seated and do not worry. You do not need to do anything else.",
+    "waiting_for_nurse": "A nurse has been informed and is coming",
+    "few_more_questions": "While you wait, just a few short questions",
+    "few_more_questions_spoken": "While the nurse is on the way, I will ask just a few short but important questions.",
+    "stay_seated": "Please stay seated",
+    "nurse_acknowledged": "A nurse has seen this and is on the way"
+  },
+
+  "documents": {
+    "title": "Do you have any medical papers with you?",
+    "title_spoken": "Do you have any old prescriptions, test reports or hospital papers with you today? Showing them helps the doctor a great deal.",
+    "why": "Old prescriptions and reports help the doctor understand your history",
+    "yes_i_have": "Yes, I have papers",
+    "no_i_dont": "No, I do not have any",
+    "use_kiosk_camera": "Photograph with this screen's camera",
+    "use_my_phone": "Use my own phone",
+    "ask_staff": "Ask a staff member to help",
+    "qr_title": "Scan this code with your phone",
+    "qr_spoken": "Open the camera on your phone and point it at the square code on the screen. A page will open on your phone where you can take photographs of your papers.",
+    "qr_step_1": "Open the camera on your phone",
+    "qr_step_2": "Point it at the code on this screen",
+    "qr_step_3": "Take a photograph of each paper",
+    "qr_expires_in": "This code works for {minutes} more minutes",
+    "qr_no_phone": "I do not have a phone with a camera",
+    "camera_hold_steady": "Hold the paper flat and steady",
+    "camera_capture": "Take photograph",
+    "camera_retake": "Take it again",
+    "camera_use_this": "Use this photograph",
+    "uploaded_count": "{count} papers received",
+    "uploading": "Sending…",
+    "upload_received": "Received",
+    "upload_processing": "We are reading it. You do not need to wait.",
+    "upload_ready": "Read successfully",
+    "upload_needs_recapture": "This photograph is not clear enough. Please take it again.",
+    "upload_failed": "This did not go through. Please try once more.",
+    "add_another": "Add another paper",
+    "done_adding": "I have finished adding papers",
+    "no_need_to_wait": "You do not need to wait for these to be read"
+  },
+
+  "review": {
+    "title": "Please check what we noted",
+    "title_spoken": "Here is what I have noted from your answers. Please listen, and tell me if anything is wrong.",
+    "listen_summary": "Listen to it",
+    "looks_correct": "Everything is correct",
+    "something_is_wrong": "Something is wrong",
+    "which_is_wrong": "Which part is wrong?",
+    "fix_this": "Change this",
+    "reported_by_you": "You told us",
+    "reported_by_caregiver": "Reported by {name}",
+    "from_your_documents": "From your papers",
+    "not_asked_emergency": "Not asked — the nurse was called",
+    "you_did_not_know": "You said you did not know"
+  },
+
+  "complete": {
+    "title": "Thank you, that is all",
+    "body": "Your information is ready for the doctor. Please wait to be called.",
+    "body_spoken": "Thank you. That is all we needed. Your information is now ready for the doctor. Please wait in the waiting area until your name is called.",
+    "token_note": "Please follow the hospital's usual waiting process",
+    "what_happens_next": "What happens next",
+    "next_step_1": "The doctor will read what you told us",
+    "next_step_2": "The doctor will check it with you",
+    "next_step_3": "Nothing is final until the doctor confirms it",
+    "finish": "Finish",
+    "finish_spoken": "Touch the button to finish. The screen will then be cleared for the next person.",
+    "clearing": "Clearing the screen for the next person…"
+  },
+
+  "status": {
+    "loading": "Please wait…",
+    "loading_spoken": "Please wait a moment.",
+    "saving": "Saving…",
+    "saved": "Saved",
+    "offline_title": "The internet is not working",
+    "offline_body": "You can continue. Your answers are saved here and will be sent when the connection returns.",
+    "offline_spoken": "The internet connection is not working at the moment. Do not worry — you can carry on answering. Nothing will be lost.",
+    "reconnected": "Connection restored. Your answers have been sent.",
+    "queued_count": "{count} answers waiting to be sent",
+    "voice_degraded": "Voice is slow right now — you can touch instead",
+    "session_timeout_warning": "Are you still there?",
+    "session_timeout_body": "This screen will be cleared soon so the next person can use it.",
+    "session_timeout_continue": "I am still here",
+    "session_timeout_spoken": "Are you still there? Touch the screen if you would like to continue.",
+    "empty_nothing_yet": "Nothing here yet",
+    "try_again": "Try again",
+    "get_help": "Get help from a staff member"
+  },
+
+  "accessibility": {
+    "increase_text": "Bigger text",
+    "decrease_text": "Smaller text",
+    "high_contrast": "High contrast",
+    "read_aloud_on": "Read aloud is on",
+    "read_aloud_off": "Read aloud is off",
+    "mute": "Turn off sound",
+    "unmute": "Turn on sound",
+    "volume": "Volume"
+  },
+
+  "privacy": {
+    "your_data_note": "Your information is used only for your treatment at this hospital",
+    "no_aadhaar_note": "We never ask for or store your Aadhaar number",
+    "screen_will_clear": "This screen is cleared completely after you finish",
+    "ai_assists_only": "A computer helps prepare your notes. Only the doctor decides."
+  }
+}

@@ -1,0 +1,1895 @@
+{
+  "$comment": [
+    "MediKiosk governed clinical content — general_medicine v1 (CLAUDE.md §11).",
+    "LANGUAGE-NEUTRAL BY CONTRACT: this file contains no patient-facing text.",
+    "Every visible or spoken string is resolved by the localization layer from the",
+    "field id, in content/i18n/<lang>/protocol.general_medicine.json. The loader",
+    "rejects this file if a display-text key appears anywhere in it.",
+    "",
+    "SOCRATES is the sole symptom-characterization framework (§11 [DECISION]).",
+    "OPQRST / OLDCARTS / PQRST are deliberately not separately implemented.",
+    "",
+    "AMPLE fields (ample: true, required: false) are reachable ONLY through the",
+    "red-flag fast path (§14) — never in the routine interview (§11).",
+    "",
+    "Changes to this file require the clinical-safety-reviewer agent and the CI",
+    "clinical-governance gate before merge (§46, §59, §61)."
+  ],
+  "protocol_family": "general_medicine",
+  "version": "v1",
+  "governance": {
+    "authored_by": "Clinical Governance Board",
+    "review_state": "prototype_pending_board_ratification",
+    "framework": "SOCRATES + ROS + PMH/PSH + drug/allergy + family + personal history"
+  },
+  "concepts": [
+    {
+      "code": "chief_complaint",
+      "category": "chief_complaint",
+      "nlu_slot": "complaint"
+    },
+    {
+      "code": "symptom_site",
+      "category": "symptom",
+      "nlu_slot": "body_site"
+    },
+    {
+      "code": "symptom_onset",
+      "category": "symptom",
+      "nlu_slot": "onset_duration"
+    },
+    {
+      "code": "symptom_character",
+      "category": "symptom",
+      "nlu_slot": "quality"
+    },
+    {
+      "code": "symptom_radiation",
+      "category": "symptom",
+      "nlu_slot": "radiation"
+    },
+    {
+      "code": "symptom_association",
+      "category": "symptom",
+      "nlu_slot": "associated_symptom"
+    },
+    {
+      "code": "symptom_time_course",
+      "category": "symptom",
+      "nlu_slot": "time_course"
+    },
+    {
+      "code": "symptom_exacerbating",
+      "category": "symptom",
+      "nlu_slot": "aggravating_factor"
+    },
+    {
+      "code": "symptom_relieving",
+      "category": "symptom",
+      "nlu_slot": "relieving_factor"
+    },
+    {
+      "code": "symptom_severity",
+      "category": "symptom",
+      "nlu_slot": "severity"
+    },
+    {
+      "code": "ros_constitutional",
+      "category": "review_of_systems"
+    },
+    {
+      "code": "ros_cardiorespiratory",
+      "category": "review_of_systems"
+    },
+    {
+      "code": "ros_gastrointestinal",
+      "category": "review_of_systems"
+    },
+    {
+      "code": "ros_genitourinary",
+      "category": "review_of_systems"
+    },
+    {
+      "code": "ros_neurological",
+      "category": "review_of_systems"
+    },
+    {
+      "code": "ros_musculoskeletal",
+      "category": "review_of_systems"
+    },
+    {
+      "code": "past_medical_condition",
+      "category": "past_medical_history"
+    },
+    {
+      "code": "condition_duration",
+      "category": "past_medical_history"
+    },
+    {
+      "code": "past_surgery",
+      "category": "past_surgical_history"
+    },
+    {
+      "code": "past_procedure",
+      "category": "procedure_history"
+    },
+    {
+      "code": "current_medication",
+      "category": "medication"
+    },
+    {
+      "code": "medication_adherence",
+      "category": "medication"
+    },
+    {
+      "code": "allergy_status",
+      "category": "allergy"
+    },
+    {
+      "code": "allergy_substance",
+      "category": "allergy"
+    },
+    {
+      "code": "allergy_reaction",
+      "category": "allergy"
+    },
+    {
+      "code": "family_condition",
+      "category": "family_history"
+    },
+    {
+      "code": "tobacco_use",
+      "category": "personal_history"
+    },
+    {
+      "code": "alcohol_use",
+      "category": "personal_history"
+    },
+    {
+      "code": "diet_pattern",
+      "category": "personal_history"
+    },
+    {
+      "code": "physical_activity",
+      "category": "personal_history"
+    },
+    {
+      "code": "sleep_pattern",
+      "category": "personal_history"
+    },
+    {
+      "code": "occupational_exposure",
+      "category": "personal_history"
+    },
+    {
+      "code": "ample_allergies",
+      "category": "ample_field"
+    },
+    {
+      "code": "ample_medications",
+      "category": "ample_field"
+    },
+    {
+      "code": "ample_past_history",
+      "category": "ample_field"
+    },
+    {
+      "code": "ample_last_oral_intake",
+      "category": "ample_field"
+    },
+    {
+      "code": "ample_events",
+      "category": "ample_field"
+    }
+  ],
+  "fields": [
+    {
+      "id": "gm.cc.primary_complaint",
+      "concept_code": "chief_complaint",
+      "category": "chief_complaint",
+      "group": "chief_complaint",
+      "order": 100,
+      "required": true,
+      "confirm_back": true,
+      "red_flag_input": true,
+      "value_type": "single_select",
+      "widget": "choice_grid",
+      "options": [
+        {
+          "value": "chest_pain",
+          "icon": "chest",
+          "critical": true
+        },
+        {
+          "value": "breathlessness",
+          "icon": "lungs",
+          "critical": true
+        },
+        {
+          "value": "fever",
+          "icon": "thermometer"
+        },
+        {
+          "value": "headache",
+          "icon": "head"
+        },
+        {
+          "value": "abdominal_pain",
+          "icon": "abdomen"
+        },
+        {
+          "value": "cough",
+          "icon": "cough"
+        },
+        {
+          "value": "weakness_fatigue",
+          "icon": "tired"
+        },
+        {
+          "value": "dizziness",
+          "icon": "dizzy"
+        },
+        {
+          "value": "joint_or_back_pain",
+          "icon": "joint"
+        },
+        {
+          "value": "vomiting",
+          "icon": "nausea"
+        },
+        {
+          "value": "loose_motions",
+          "icon": "intestine"
+        },
+        {
+          "value": "burning_urination",
+          "icon": "kidney"
+        },
+        {
+          "value": "skin_problem",
+          "icon": "skin"
+        },
+        {
+          "value": "swelling",
+          "icon": "swelling"
+        },
+        {
+          "value": "injury",
+          "icon": "bandage",
+          "critical": true
+        },
+        {
+          "value": "other",
+          "icon": "more"
+        }
+      ]
+    },
+    {
+      "id": "gm.cc.other_detail",
+      "concept_code": "chief_complaint",
+      "category": "chief_complaint",
+      "group": "chief_complaint",
+      "order": 110,
+      "required": true,
+      "value_type": "text",
+      "widget": "short_text",
+      "validation": {
+        "max_length": 300
+      },
+      "depends_on": {
+        "op": "equals",
+        "field": "gm.cc.primary_complaint",
+        "value": "other"
+      }
+    },
+    {
+      "id": "gm.cc.duration_of_concern",
+      "concept_code": "symptom_onset",
+      "category": "symptom",
+      "group": "chief_complaint",
+      "order": 120,
+      "required": true,
+      "red_flag_input": true,
+      "value_type": "duration",
+      "widget": "duration_picker",
+      "validation": {
+        "units": [
+          "hours",
+          "days",
+          "weeks",
+          "months",
+          "years"
+        ]
+      },
+      "depends_on": {
+        "op": "answered",
+        "field": "gm.cc.primary_complaint"
+      }
+    },
+    {
+      "id": "gm.hpi.site",
+      "concept_code": "symptom_site",
+      "category": "symptom",
+      "group": "hpi",
+      "order": 200,
+      "required": true,
+      "confirm_back": true,
+      "red_flag_input": true,
+      "value_type": "body_region",
+      "widget": "body_map",
+      "options": [
+        {
+          "value": "head",
+          "icon": "head"
+        },
+        {
+          "value": "face",
+          "icon": "face"
+        },
+        {
+          "value": "neck",
+          "icon": "neck"
+        },
+        {
+          "value": "chest_left",
+          "icon": "chest",
+          "critical": true
+        },
+        {
+          "value": "chest_center",
+          "icon": "chest",
+          "critical": true
+        },
+        {
+          "value": "chest_right",
+          "icon": "chest"
+        },
+        {
+          "value": "upper_back",
+          "icon": "back"
+        },
+        {
+          "value": "lower_back",
+          "icon": "back"
+        },
+        {
+          "value": "upper_abdomen",
+          "icon": "abdomen"
+        },
+        {
+          "value": "lower_abdomen",
+          "icon": "abdomen"
+        },
+        {
+          "value": "right_arm",
+          "icon": "arm"
+        },
+        {
+          "value": "left_arm",
+          "icon": "arm"
+        },
+        {
+          "value": "right_leg",
+          "icon": "leg"
+        },
+        {
+          "value": "left_leg",
+          "icon": "leg"
+        },
+        {
+          "value": "whole_body",
+          "icon": "body"
+        },
+        {
+          "value": "not_a_body_area",
+          "icon": "none",
+          "exclusive": true
+        }
+      ],
+      "depends_on": {
+        "op": "in",
+        "field": "gm.cc.primary_complaint",
+        "values": [
+          "chest_pain",
+          "headache",
+          "abdominal_pain",
+          "joint_or_back_pain",
+          "skin_problem",
+          "swelling",
+          "injury",
+          "other"
+        ]
+      }
+    },
+    {
+      "id": "gm.hpi.character",
+      "concept_code": "symptom_character",
+      "category": "symptom",
+      "group": "hpi",
+      "order": 210,
+      "required": true,
+      "red_flag_input": true,
+      "value_type": "multi_select",
+      "widget": "multi_choice_grid",
+      "options": [
+        {
+          "value": "crushing",
+          "icon": "crush",
+          "critical": true
+        },
+        {
+          "value": "pressing",
+          "icon": "press",
+          "critical": true
+        },
+        {
+          "value": "burning",
+          "icon": "burn"
+        },
+        {
+          "value": "sharp",
+          "icon": "sharp"
+        },
+        {
+          "value": "dull_ache",
+          "icon": "dull"
+        },
+        {
+          "value": "cramping",
+          "icon": "cramp"
+        },
+        {
+          "value": "throbbing",
+          "icon": "throb"
+        },
+        {
+          "value": "stabbing",
+          "icon": "stab"
+        },
+        {
+          "value": "tearing",
+          "icon": "tear",
+          "critical": true
+        },
+        {
+          "value": "cannot_describe",
+          "icon": "unsure",
+          "exclusive": true
+        }
+      ],
+      "depends_on": {
+        "op": "in",
+        "field": "gm.cc.primary_complaint",
+        "values": [
+          "chest_pain",
+          "headache",
+          "abdominal_pain",
+          "joint_or_back_pain",
+          "injury"
+        ]
+      }
+    },
+    {
+      "id": "gm.hpi.radiation",
+      "concept_code": "symptom_radiation",
+      "category": "symptom",
+      "group": "hpi",
+      "order": 220,
+      "required": true,
+      "red_flag_input": true,
+      "value_type": "multi_select",
+      "widget": "multi_choice_grid",
+      "options": [
+        {
+          "value": "left_arm",
+          "icon": "arm",
+          "critical": true
+        },
+        {
+          "value": "right_arm",
+          "icon": "arm"
+        },
+        {
+          "value": "jaw",
+          "icon": "jaw",
+          "critical": true
+        },
+        {
+          "value": "neck",
+          "icon": "neck"
+        },
+        {
+          "value": "back",
+          "icon": "back"
+        },
+        {
+          "value": "shoulder",
+          "icon": "shoulder"
+        },
+        {
+          "value": "abdomen",
+          "icon": "abdomen"
+        },
+        {
+          "value": "down_the_leg",
+          "icon": "leg"
+        },
+        {
+          "value": "does_not_spread",
+          "icon": "none",
+          "exclusive": true
+        }
+      ],
+      "depends_on": {
+        "op": "in",
+        "field": "gm.cc.primary_complaint",
+        "values": [
+          "chest_pain",
+          "abdominal_pain",
+          "joint_or_back_pain",
+          "headache"
+        ]
+      }
+    },
+    {
+      "id": "gm.hpi.associated_symptoms",
+      "concept_code": "symptom_association",
+      "category": "symptom",
+      "group": "hpi",
+      "order": 230,
+      "required": true,
+      "red_flag_input": true,
+      "value_type": "multi_select",
+      "widget": "multi_choice_grid",
+      "options": [
+        {
+          "value": "breathlessness",
+          "icon": "lungs",
+          "critical": true
+        },
+        {
+          "value": "cold_sweating",
+          "icon": "sweat",
+          "critical": true
+        },
+        {
+          "value": "nausea",
+          "icon": "nausea"
+        },
+        {
+          "value": "vomiting",
+          "icon": "vomit"
+        },
+        {
+          "value": "palpitations",
+          "icon": "heartbeat"
+        },
+        {
+          "value": "fainting",
+          "icon": "faint",
+          "critical": true
+        },
+        {
+          "value": "dizziness",
+          "icon": "dizzy"
+        },
+        {
+          "value": "fever",
+          "icon": "thermometer"
+        },
+        {
+          "value": "cough",
+          "icon": "cough"
+        },
+        {
+          "value": "coughing_blood",
+          "icon": "blood",
+          "critical": true
+        },
+        {
+          "value": "weakness_one_side",
+          "icon": "stroke",
+          "critical": true
+        },
+        {
+          "value": "speech_difficulty",
+          "icon": "speech",
+          "critical": true
+        },
+        {
+          "value": "vision_change",
+          "icon": "eye",
+          "critical": true
+        },
+        {
+          "value": "no_other_symptoms",
+          "icon": "none",
+          "exclusive": true
+        }
+      ],
+      "depends_on": {
+        "op": "answered",
+        "field": "gm.cc.primary_complaint"
+      }
+    },
+    {
+      "id": "gm.hpi.time_course",
+      "concept_code": "symptom_time_course",
+      "category": "symptom",
+      "group": "hpi",
+      "order": 240,
+      "required": true,
+      "red_flag_input": true,
+      "value_type": "single_select",
+      "widget": "choice_grid",
+      "options": [
+        {
+          "value": "constant_since_start",
+          "icon": "line_flat"
+        },
+        {
+          "value": "comes_and_goes",
+          "icon": "line_wave"
+        },
+        {
+          "value": "getting_worse",
+          "icon": "line_up",
+          "critical": true
+        },
+        {
+          "value": "getting_better",
+          "icon": "line_down"
+        },
+        {
+          "value": "sudden_and_severe",
+          "icon": "bolt",
+          "critical": true
+        }
+      ],
+      "depends_on": {
+        "op": "answered",
+        "field": "gm.cc.primary_complaint"
+      }
+    },
+    {
+      "id": "gm.hpi.exacerbating",
+      "concept_code": "symptom_exacerbating",
+      "category": "symptom",
+      "group": "hpi",
+      "order": 250,
+      "value_type": "multi_select",
+      "widget": "multi_choice_grid",
+      "red_flag_input": true,
+      "options": [
+        {
+          "value": "physical_exertion",
+          "icon": "walk",
+          "critical": true
+        },
+        {
+          "value": "deep_breathing",
+          "icon": "lungs"
+        },
+        {
+          "value": "eating",
+          "icon": "food"
+        },
+        {
+          "value": "empty_stomach",
+          "icon": "empty_plate"
+        },
+        {
+          "value": "movement",
+          "icon": "move"
+        },
+        {
+          "value": "lying_down",
+          "icon": "bed"
+        },
+        {
+          "value": "stress",
+          "icon": "stress"
+        },
+        {
+          "value": "cold_weather",
+          "icon": "cold"
+        },
+        {
+          "value": "nothing_in_particular",
+          "icon": "none",
+          "exclusive": true
+        }
+      ],
+      "depends_on": {
+        "op": "answered",
+        "field": "gm.cc.primary_complaint"
+      }
+    },
+    {
+      "id": "gm.hpi.relieving",
+      "concept_code": "symptom_relieving",
+      "category": "symptom",
+      "group": "hpi",
+      "order": 260,
+      "value_type": "multi_select",
+      "widget": "multi_choice_grid",
+      "options": [
+        {
+          "value": "rest",
+          "icon": "rest"
+        },
+        {
+          "value": "medicine",
+          "icon": "pill"
+        },
+        {
+          "value": "eating",
+          "icon": "food"
+        },
+        {
+          "value": "sitting_up",
+          "icon": "sit"
+        },
+        {
+          "value": "passing_stool_or_gas",
+          "icon": "intestine"
+        },
+        {
+          "value": "nothing_helps",
+          "icon": "none",
+          "exclusive": true
+        }
+      ],
+      "depends_on": {
+        "op": "answered",
+        "field": "gm.cc.primary_complaint"
+      }
+    },
+    {
+      "id": "gm.hpi.severity",
+      "concept_code": "symptom_severity",
+      "category": "symptom",
+      "group": "hpi",
+      "order": 270,
+      "required": true,
+      "red_flag_input": true,
+      "value_type": "scale",
+      "widget": "severity_faces",
+      "validation": {
+        "min": 0,
+        "max": 10
+      },
+      "depends_on": {
+        "op": "answered",
+        "field": "gm.cc.primary_complaint"
+      }
+    },
+    {
+      "id": "gm.ros.constitutional",
+      "concept_code": "ros_constitutional",
+      "category": "review_of_systems",
+      "group": "review_of_systems",
+      "order": 300,
+      "required": true,
+      "red_flag_input": true,
+      "value_type": "multi_select",
+      "widget": "multi_choice_grid",
+      "options": [
+        {
+          "value": "weight_loss",
+          "icon": "scale_down",
+          "critical": true
+        },
+        {
+          "value": "night_sweats",
+          "icon": "sweat"
+        },
+        {
+          "value": "persistent_fever",
+          "icon": "thermometer"
+        },
+        {
+          "value": "loss_of_appetite",
+          "icon": "empty_plate"
+        },
+        {
+          "value": "unusual_tiredness",
+          "icon": "tired"
+        },
+        {
+          "value": "none_of_these",
+          "icon": "none",
+          "exclusive": true
+        }
+      ]
+    },
+    {
+      "id": "gm.ros.cardiorespiratory",
+      "concept_code": "ros_cardiorespiratory",
+      "category": "review_of_systems",
+      "group": "review_of_systems",
+      "order": 310,
+      "required": true,
+      "red_flag_input": true,
+      "value_type": "multi_select",
+      "widget": "multi_choice_grid",
+      "options": [
+        {
+          "value": "breathless_on_walking",
+          "icon": "walk"
+        },
+        {
+          "value": "breathless_lying_flat",
+          "icon": "bed",
+          "critical": true
+        },
+        {
+          "value": "ankle_swelling",
+          "icon": "swelling"
+        },
+        {
+          "value": "chest_tightness",
+          "icon": "chest",
+          "critical": true
+        },
+        {
+          "value": "long_standing_cough",
+          "icon": "cough"
+        },
+        {
+          "value": "wheezing",
+          "icon": "wheeze"
+        },
+        {
+          "value": "none_of_these",
+          "icon": "none",
+          "exclusive": true
+        }
+      ]
+    },
+    {
+      "id": "gm.ros.gastrointestinal",
+      "concept_code": "ros_gastrointestinal",
+      "category": "review_of_systems",
+      "group": "review_of_systems",
+      "order": 320,
+      "required": true,
+      "red_flag_input": true,
+      "value_type": "multi_select",
+      "widget": "multi_choice_grid",
+      "options": [
+        {
+          "value": "black_or_bloody_stool",
+          "icon": "blood",
+          "critical": true
+        },
+        {
+          "value": "vomiting_blood",
+          "icon": "blood",
+          "critical": true
+        },
+        {
+          "value": "difficulty_swallowing",
+          "icon": "throat"
+        },
+        {
+          "value": "acidity_heartburn",
+          "icon": "burn"
+        },
+        {
+          "value": "constipation",
+          "icon": "intestine"
+        },
+        {
+          "value": "yellowing_of_eyes",
+          "icon": "eye"
+        },
+        {
+          "value": "none_of_these",
+          "icon": "none",
+          "exclusive": true
+        }
+      ]
+    },
+    {
+      "id": "gm.ros.genitourinary",
+      "concept_code": "ros_genitourinary",
+      "category": "review_of_systems",
+      "group": "review_of_systems",
+      "order": 330,
+      "required": true,
+      "value_type": "multi_select",
+      "widget": "multi_choice_grid",
+      "options": [
+        {
+          "value": "burning_urination",
+          "icon": "kidney"
+        },
+        {
+          "value": "blood_in_urine",
+          "icon": "blood",
+          "critical": true
+        },
+        {
+          "value": "passing_urine_often",
+          "icon": "drop"
+        },
+        {
+          "value": "reduced_urine",
+          "icon": "drop_low",
+          "critical": true
+        },
+        {
+          "value": "none_of_these",
+          "icon": "none",
+          "exclusive": true
+        }
+      ],
+      "red_flag_input": true
+    },
+    {
+      "id": "gm.ros.neurological",
+      "concept_code": "ros_neurological",
+      "category": "review_of_systems",
+      "group": "review_of_systems",
+      "order": 340,
+      "required": true,
+      "red_flag_input": true,
+      "value_type": "multi_select",
+      "widget": "multi_choice_grid",
+      "options": [
+        {
+          "value": "fits_or_seizures",
+          "icon": "seizure",
+          "critical": true
+        },
+        {
+          "value": "loss_of_consciousness",
+          "icon": "faint",
+          "critical": true
+        },
+        {
+          "value": "numbness_or_tingling",
+          "icon": "tingle"
+        },
+        {
+          "value": "sudden_confusion",
+          "icon": "confusion",
+          "critical": true
+        },
+        {
+          "value": "worst_headache_ever",
+          "icon": "head",
+          "critical": true
+        },
+        {
+          "value": "neck_stiffness",
+          "icon": "neck",
+          "critical": true
+        },
+        {
+          "value": "none_of_these",
+          "icon": "none",
+          "exclusive": true
+        }
+      ]
+    },
+    {
+      "id": "gm.ros.musculoskeletal",
+      "concept_code": "ros_musculoskeletal",
+      "category": "review_of_systems",
+      "group": "review_of_systems",
+      "order": 350,
+      "required": true,
+      "value_type": "multi_select",
+      "widget": "multi_choice_grid",
+      "options": [
+        {
+          "value": "joint_swelling",
+          "icon": "joint"
+        },
+        {
+          "value": "morning_stiffness",
+          "icon": "stiff"
+        },
+        {
+          "value": "muscle_weakness",
+          "icon": "muscle"
+        },
+        {
+          "value": "difficulty_walking",
+          "icon": "walk"
+        },
+        {
+          "value": "none_of_these",
+          "icon": "none",
+          "exclusive": true
+        }
+      ]
+    },
+    {
+      "id": "gm.pmh.conditions",
+      "concept_code": "past_medical_condition",
+      "category": "past_medical_history",
+      "group": "past_medical_history",
+      "order": 400,
+      "required": true,
+      "confirm_back": true,
+      "red_flag_input": true,
+      "value_type": "multi_select",
+      "widget": "multi_choice_grid",
+      "options": [
+        {
+          "value": "diabetes",
+          "icon": "glucose"
+        },
+        {
+          "value": "high_blood_pressure",
+          "icon": "bp"
+        },
+        {
+          "value": "heart_disease",
+          "icon": "heart",
+          "critical": true
+        },
+        {
+          "value": "asthma",
+          "icon": "inhaler"
+        },
+        {
+          "value": "copd",
+          "icon": "lungs"
+        },
+        {
+          "value": "tuberculosis",
+          "icon": "lungs"
+        },
+        {
+          "value": "kidney_disease",
+          "icon": "kidney"
+        },
+        {
+          "value": "liver_disease",
+          "icon": "liver"
+        },
+        {
+          "value": "thyroid_disorder",
+          "icon": "thyroid"
+        },
+        {
+          "value": "stroke_or_paralysis",
+          "icon": "stroke",
+          "critical": true
+        },
+        {
+          "value": "cancer",
+          "icon": "cell"
+        },
+        {
+          "value": "epilepsy",
+          "icon": "seizure"
+        },
+        {
+          "value": "mental_health_condition",
+          "icon": "mind"
+        },
+        {
+          "value": "anaemia",
+          "icon": "blood"
+        },
+        {
+          "value": "none_known",
+          "icon": "none",
+          "exclusive": true
+        }
+      ]
+    },
+    {
+      "id": "gm.pmh.longest_condition_years",
+      "concept_code": "condition_duration",
+      "category": "past_medical_history",
+      "group": "past_medical_history",
+      "order": 410,
+      "value_type": "number",
+      "widget": "number_pad",
+      "validation": {
+        "min": 0,
+        "max": 90,
+        "units": [
+          "years"
+        ]
+      },
+      "depends_on": {
+        "op": "not",
+        "args": [
+          {
+            "op": "contains",
+            "field": "gm.pmh.conditions",
+            "value": "none_known"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gm.psh.had_surgery",
+      "concept_code": "past_surgery",
+      "category": "past_surgical_history",
+      "group": "past_surgical_history",
+      "order": 420,
+      "required": true,
+      "value_type": "boolean",
+      "widget": "yes_no"
+    },
+    {
+      "id": "gm.psh.surgeries",
+      "concept_code": "past_surgery",
+      "category": "past_surgical_history",
+      "group": "past_surgical_history",
+      "order": 430,
+      "required": true,
+      "value_type": "multi_select",
+      "widget": "multi_choice_grid",
+      "options": [
+        {
+          "value": "appendix",
+          "icon": "abdomen"
+        },
+        {
+          "value": "gallbladder",
+          "icon": "liver"
+        },
+        {
+          "value": "hernia",
+          "icon": "abdomen"
+        },
+        {
+          "value": "caesarean",
+          "icon": "baby"
+        },
+        {
+          "value": "hysterectomy",
+          "icon": "uterus"
+        },
+        {
+          "value": "heart_surgery",
+          "icon": "heart"
+        },
+        {
+          "value": "bone_or_joint",
+          "icon": "joint"
+        },
+        {
+          "value": "eye_surgery",
+          "icon": "eye"
+        },
+        {
+          "value": "other_surgery",
+          "icon": "more"
+        }
+      ],
+      "depends_on": {
+        "op": "is_true",
+        "field": "gm.psh.had_surgery"
+      }
+    },
+    {
+      "id": "gm.proc.procedures",
+      "concept_code": "past_procedure",
+      "category": "procedure_history",
+      "group": "procedure_history",
+      "order": 440,
+      "required": true,
+      "value_type": "multi_select",
+      "widget": "multi_choice_grid",
+      "options": [
+        {
+          "value": "endoscopy",
+          "icon": "scope"
+        },
+        {
+          "value": "colonoscopy",
+          "icon": "scope"
+        },
+        {
+          "value": "angiography",
+          "icon": "heart"
+        },
+        {
+          "value": "angioplasty_stent",
+          "icon": "stent",
+          "critical": true
+        },
+        {
+          "value": "pacemaker",
+          "icon": "pacemaker",
+          "critical": true
+        },
+        {
+          "value": "dialysis",
+          "icon": "kidney",
+          "critical": true
+        },
+        {
+          "value": "biopsy",
+          "icon": "needle"
+        },
+        {
+          "value": "blood_transfusion",
+          "icon": "blood"
+        },
+        {
+          "value": "chemotherapy_or_radiotherapy",
+          "icon": "cell"
+        },
+        {
+          "value": "none_of_these",
+          "icon": "none",
+          "exclusive": true
+        }
+      ]
+    },
+    {
+      "id": "gm.med.taking_medicines",
+      "concept_code": "current_medication",
+      "category": "medication",
+      "group": "medications",
+      "order": 500,
+      "required": true,
+      "red_flag_input": true,
+      "value_type": "single_select",
+      "widget": "choice_grid",
+      "options": [
+        {
+          "value": "yes_regularly",
+          "icon": "pill"
+        },
+        {
+          "value": "yes_sometimes",
+          "icon": "pill_half"
+        },
+        {
+          "value": "no",
+          "icon": "none"
+        },
+        {
+          "value": "not_sure",
+          "icon": "unsure"
+        }
+      ]
+    },
+    {
+      "id": "gm.med.list",
+      "concept_code": "current_medication",
+      "category": "medication",
+      "group": "medications",
+      "order": 510,
+      "required": true,
+      "confirm_back": true,
+      "value_type": "text",
+      "widget": "long_text",
+      "validation": {
+        "max_length": 800
+      },
+      "depends_on": {
+        "op": "in",
+        "field": "gm.med.taking_medicines",
+        "values": [
+          "yes_regularly",
+          "yes_sometimes"
+        ]
+      }
+    },
+    {
+      "id": "gm.med.adherence",
+      "concept_code": "medication_adherence",
+      "category": "medication",
+      "group": "medications",
+      "order": 520,
+      "value_type": "single_select",
+      "widget": "choice_grid",
+      "options": [
+        {
+          "value": "never_miss",
+          "icon": "check"
+        },
+        {
+          "value": "miss_sometimes",
+          "icon": "warn"
+        },
+        {
+          "value": "stopped_on_my_own",
+          "icon": "stop",
+          "critical": true
+        },
+        {
+          "value": "stopped_on_doctor_advice",
+          "icon": "doctor"
+        }
+      ],
+      "depends_on": {
+        "op": "in",
+        "field": "gm.med.taking_medicines",
+        "values": [
+          "yes_regularly",
+          "yes_sometimes"
+        ]
+      },
+      "red_flag_input": true
+    },
+    {
+      "id": "gm.allergy.has_allergy",
+      "concept_code": "allergy_status",
+      "category": "allergy",
+      "group": "allergies",
+      "order": 600,
+      "required": true,
+      "confirm_back": true,
+      "red_flag_input": true,
+      "value_type": "single_select",
+      "widget": "choice_grid",
+      "options": [
+        {
+          "value": "yes",
+          "icon": "alert",
+          "critical": true
+        },
+        {
+          "value": "no",
+          "icon": "none"
+        },
+        {
+          "value": "not_sure",
+          "icon": "unsure"
+        }
+      ]
+    },
+    {
+      "id": "gm.allergy.substances",
+      "concept_code": "allergy_substance",
+      "category": "allergy",
+      "group": "allergies",
+      "order": 610,
+      "required": true,
+      "confirm_back": true,
+      "value_type": "multi_select",
+      "widget": "multi_choice_grid",
+      "options": [
+        {
+          "value": "penicillin",
+          "icon": "pill",
+          "critical": true
+        },
+        {
+          "value": "sulfa_drugs",
+          "icon": "pill",
+          "critical": true
+        },
+        {
+          "value": "aspirin_or_painkillers",
+          "icon": "pill",
+          "critical": true
+        },
+        {
+          "value": "anaesthetic",
+          "icon": "syringe",
+          "critical": true
+        },
+        {
+          "value": "contrast_dye",
+          "icon": "scan",
+          "critical": true
+        },
+        {
+          "value": "food",
+          "icon": "food"
+        },
+        {
+          "value": "dust_or_pollen",
+          "icon": "pollen"
+        },
+        {
+          "value": "other_medicine",
+          "icon": "more"
+        },
+        {
+          "value": "do_not_know_the_name",
+          "icon": "unsure"
+        }
+      ],
+      "depends_on": {
+        "op": "equals",
+        "field": "gm.allergy.has_allergy",
+        "value": "yes"
+      }
+    },
+    {
+      "id": "gm.allergy.reaction",
+      "concept_code": "allergy_reaction",
+      "category": "allergy",
+      "group": "allergies",
+      "order": 620,
+      "required": true,
+      "red_flag_input": true,
+      "value_type": "multi_select",
+      "widget": "multi_choice_grid",
+      "options": [
+        {
+          "value": "rash_or_itching",
+          "icon": "skin"
+        },
+        {
+          "value": "swelling_of_face_or_lips",
+          "icon": "swelling",
+          "critical": true
+        },
+        {
+          "value": "difficulty_breathing",
+          "icon": "lungs",
+          "critical": true
+        },
+        {
+          "value": "collapse_or_fainting",
+          "icon": "faint",
+          "critical": true
+        },
+        {
+          "value": "stomach_upset",
+          "icon": "abdomen"
+        },
+        {
+          "value": "do_not_remember",
+          "icon": "unsure"
+        }
+      ],
+      "depends_on": {
+        "op": "equals",
+        "field": "gm.allergy.has_allergy",
+        "value": "yes"
+      }
+    },
+    {
+      "id": "gm.fh.conditions",
+      "concept_code": "family_condition",
+      "category": "family_history",
+      "group": "family_history",
+      "order": 700,
+      "required": true,
+      "value_type": "multi_select",
+      "widget": "multi_choice_grid",
+      "options": [
+        {
+          "value": "diabetes",
+          "icon": "glucose"
+        },
+        {
+          "value": "high_blood_pressure",
+          "icon": "bp"
+        },
+        {
+          "value": "heart_attack_before_60",
+          "icon": "heart",
+          "critical": true
+        },
+        {
+          "value": "stroke",
+          "icon": "stroke"
+        },
+        {
+          "value": "cancer",
+          "icon": "cell"
+        },
+        {
+          "value": "tuberculosis",
+          "icon": "lungs"
+        },
+        {
+          "value": "asthma_or_allergy",
+          "icon": "inhaler"
+        },
+        {
+          "value": "kidney_disease",
+          "icon": "kidney"
+        },
+        {
+          "value": "mental_health_condition",
+          "icon": "mind"
+        },
+        {
+          "value": "sudden_death_in_family",
+          "icon": "alert",
+          "critical": true
+        },
+        {
+          "value": "none_known",
+          "icon": "none",
+          "exclusive": true
+        }
+      ]
+    },
+    {
+      "id": "gm.ph.tobacco",
+      "concept_code": "tobacco_use",
+      "category": "personal_history",
+      "group": "personal_history",
+      "order": 800,
+      "required": true,
+      "value_type": "single_select",
+      "widget": "choice_grid",
+      "options": [
+        {
+          "value": "never",
+          "icon": "none"
+        },
+        {
+          "value": "smoke_currently",
+          "icon": "cigarette"
+        },
+        {
+          "value": "chew_currently",
+          "icon": "tobacco"
+        },
+        {
+          "value": "both",
+          "icon": "tobacco"
+        },
+        {
+          "value": "quit",
+          "icon": "quit"
+        }
+      ]
+    },
+    {
+      "id": "gm.ph.alcohol",
+      "concept_code": "alcohol_use",
+      "category": "personal_history",
+      "group": "personal_history",
+      "order": 810,
+      "required": true,
+      "value_type": "single_select",
+      "widget": "choice_grid",
+      "options": [
+        {
+          "value": "never",
+          "icon": "none"
+        },
+        {
+          "value": "occasionally",
+          "icon": "glass"
+        },
+        {
+          "value": "weekly",
+          "icon": "glass"
+        },
+        {
+          "value": "daily",
+          "icon": "glass",
+          "critical": true
+        },
+        {
+          "value": "quit",
+          "icon": "quit"
+        }
+      ]
+    },
+    {
+      "id": "gm.ph.diet",
+      "concept_code": "diet_pattern",
+      "category": "personal_history",
+      "group": "personal_history",
+      "order": 820,
+      "required": true,
+      "value_type": "single_select",
+      "widget": "choice_grid",
+      "options": [
+        {
+          "value": "vegetarian",
+          "icon": "leaf"
+        },
+        {
+          "value": "mixed",
+          "icon": "food"
+        },
+        {
+          "value": "mostly_non_vegetarian",
+          "icon": "food"
+        },
+        {
+          "value": "irregular_meals",
+          "icon": "clock",
+          "critical": true
+        }
+      ]
+    },
+    {
+      "id": "gm.ph.physical_activity",
+      "concept_code": "physical_activity",
+      "category": "personal_history",
+      "group": "personal_history",
+      "order": 830,
+      "required": true,
+      "value_type": "single_select",
+      "widget": "choice_grid",
+      "options": [
+        {
+          "value": "mostly_sitting",
+          "icon": "sit"
+        },
+        {
+          "value": "light_walking",
+          "icon": "walk"
+        },
+        {
+          "value": "physically_demanding_work",
+          "icon": "lift"
+        },
+        {
+          "value": "regular_exercise",
+          "icon": "run"
+        }
+      ]
+    },
+    {
+      "id": "gm.ph.sleep",
+      "concept_code": "sleep_pattern",
+      "category": "personal_history",
+      "group": "personal_history",
+      "order": 840,
+      "required": true,
+      "value_type": "single_select",
+      "widget": "choice_grid",
+      "options": [
+        {
+          "value": "sleeping_well",
+          "icon": "sleep"
+        },
+        {
+          "value": "difficulty_falling_asleep",
+          "icon": "moon"
+        },
+        {
+          "value": "waking_at_night",
+          "icon": "moon"
+        },
+        {
+          "value": "breathless_or_snoring_at_night",
+          "icon": "bed",
+          "critical": true
+        }
+      ]
+    },
+    {
+      "id": "gm.ph.occupational_exposure",
+      "concept_code": "occupational_exposure",
+      "category": "personal_history",
+      "group": "personal_history",
+      "order": 850,
+      "value_type": "multi_select",
+      "widget": "multi_choice_grid",
+      "options": [
+        {
+          "value": "dust_or_smoke",
+          "icon": "dust"
+        },
+        {
+          "value": "chemicals_or_pesticides",
+          "icon": "chemical"
+        },
+        {
+          "value": "heavy_lifting",
+          "icon": "lift"
+        },
+        {
+          "value": "long_standing_hours",
+          "icon": "stand"
+        },
+        {
+          "value": "night_shifts",
+          "icon": "moon"
+        },
+        {
+          "value": "none_of_these",
+          "icon": "none",
+          "exclusive": true
+        }
+      ]
+    },
+    {
+      "$comment": "AMPLE fast path (§14). required:false keeps these out of the routine interview; ample:true puts them in R(state) only after a red flag escalates the session.",
+      "id": "gm.ample.allergies",
+      "concept_code": "ample_allergies",
+      "category": "ample_field",
+      "group": "ample_fast_path",
+      "order": 900,
+      "required": false,
+      "ample": true,
+      "red_flag_input": true,
+      "value_type": "single_select",
+      "widget": "choice_grid",
+      "options": [
+        {
+          "value": "yes",
+          "icon": "alert",
+          "critical": true
+        },
+        {
+          "value": "no",
+          "icon": "none"
+        },
+        {
+          "value": "not_sure",
+          "icon": "unsure"
+        }
+      ],
+      "depends_on": {
+        "op": "not",
+        "args": [
+          {
+            "op": "answered",
+            "field": "gm.allergy.has_allergy"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gm.ample.medications",
+      "concept_code": "ample_medications",
+      "category": "ample_field",
+      "group": "ample_fast_path",
+      "order": 910,
+      "required": false,
+      "ample": true,
+      "value_type": "single_select",
+      "widget": "choice_grid",
+      "options": [
+        {
+          "value": "yes",
+          "icon": "pill"
+        },
+        {
+          "value": "no",
+          "icon": "none"
+        },
+        {
+          "value": "not_sure",
+          "icon": "unsure"
+        }
+      ],
+      "depends_on": {
+        "op": "not",
+        "args": [
+          {
+            "op": "answered",
+            "field": "gm.med.taking_medicines"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gm.ample.past_history",
+      "concept_code": "ample_past_history",
+      "category": "ample_field",
+      "group": "ample_fast_path",
+      "order": 920,
+      "required": false,
+      "ample": true,
+      "value_type": "multi_select",
+      "widget": "multi_choice_grid",
+      "options": [
+        {
+          "value": "heart_problem",
+          "icon": "heart",
+          "critical": true
+        },
+        {
+          "value": "diabetes",
+          "icon": "glucose"
+        },
+        {
+          "value": "high_blood_pressure",
+          "icon": "bp"
+        },
+        {
+          "value": "asthma_or_lung_problem",
+          "icon": "lungs"
+        },
+        {
+          "value": "stroke_or_paralysis",
+          "icon": "stroke",
+          "critical": true
+        },
+        {
+          "value": "kidney_problem",
+          "icon": "kidney"
+        },
+        {
+          "value": "pregnancy",
+          "icon": "baby",
+          "critical": true
+        },
+        {
+          "value": "none_of_these",
+          "icon": "none",
+          "exclusive": true
+        }
+      ]
+    },
+    {
+      "id": "gm.ample.last_oral_intake",
+      "concept_code": "ample_last_oral_intake",
+      "category": "ample_field",
+      "group": "ample_fast_path",
+      "order": 930,
+      "required": false,
+      "ample": true,
+      "value_type": "single_select",
+      "widget": "choice_grid",
+      "options": [
+        {
+          "value": "within_1_hour",
+          "icon": "clock"
+        },
+        {
+          "value": "1_to_4_hours",
+          "icon": "clock"
+        },
+        {
+          "value": "4_to_8_hours",
+          "icon": "clock"
+        },
+        {
+          "value": "more_than_8_hours",
+          "icon": "clock"
+        },
+        {
+          "value": "not_sure",
+          "icon": "unsure"
+        }
+      ]
+    },
+    {
+      "id": "gm.ample.events",
+      "concept_code": "ample_events",
+      "category": "ample_field",
+      "group": "ample_fast_path",
+      "order": 940,
+      "required": false,
+      "ample": true,
+      "value_type": "multi_select",
+      "widget": "multi_choice_grid",
+      "options": [
+        {
+          "value": "started_suddenly_at_rest",
+          "icon": "bolt",
+          "critical": true
+        },
+        {
+          "value": "started_during_exertion",
+          "icon": "walk",
+          "critical": true
+        },
+        {
+          "value": "after_a_fall_or_injury",
+          "icon": "bandage",
+          "critical": true
+        },
+        {
+          "value": "after_taking_a_medicine",
+          "icon": "pill",
+          "critical": true
+        },
+        {
+          "value": "after_eating",
+          "icon": "food"
+        },
+        {
+          "value": "gradually_over_days",
+          "icon": "calendar"
+        },
+        {
+          "value": "not_sure",
+          "icon": "unsure"
+        }
+      ]
+    }
+  ]
+}

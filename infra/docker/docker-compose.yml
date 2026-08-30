@@ -1,0 +1,425 @@
+# =============================================================================
+# MediKiosk — application layer (CLAUDE.md §44, §55)
+#
+# Docker Compose deploys the APPLICATION onto Terraform-provisioned
+# infrastructure (§42-45). Kubernetes and Kafka are deliberately NOT here
+# [RED LINE — no premature infra].
+#
+#   docker compose -f infra/docker/docker-compose.yml up -d \
+#       postgres redis rabbitmq keycloak opa minio
+# =============================================================================
+
+name: medikiosk
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL — the clinical system of record. RLS is enabled by migration
+  # 0001 and the API connects as the NOBYPASSRLS role medikiosk_app (§30).
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: medikiosk-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-medikiosk}
+      POSTGRES_USER: ${POSTGRES_SUPERUSER:-medikiosk_owner}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devonly_change_me}
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    command:
+      - postgres
+      - -c
+      - log_statement=ddl
+      - -c
+      - log_min_duration_statement=500
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_SUPERUSER:-medikiosk_owner} -d ${POSTGRES_DB:-medikiosk}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    logging: *default-logging
+
+  # ---------------------------------------------------------------------------
+  # Redis — transient in-progress session state ONLY. Purged synchronously at
+  # submission by the purge module (§38) — never left to a scheduled job.
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: medikiosk-redis
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - "no"
+      - --save
+      - ""
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - noeviction
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    logging: *default-logging
+
+  # ---------------------------------------------------------------------------
+  # RabbitMQ — async work only: documents, notifications, integration relay.
+  # [RED LINE §50] the interactive patient loop never touches this broker.
+  # ---------------------------------------------------------------------------
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: medikiosk-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-medikiosk}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-devonly_change_me}
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_MGMT_PORT:-15672}:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+    logging: *default-logging
+
+  # ---------------------------------------------------------------------------
+  # Keycloak — OIDC identity provider, tenant claim source, MFA for privileged
+  # roles (§5.1, §27). The realm and the 7 roles are imported at start.
+  # ---------------------------------------------------------------------------
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    container_name: medikiosk-keycloak
+    restart: unless-stopped
+    command:
+      - start-dev
+      - --import-realm
+      - --http-port=8080
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-devonly_change_me}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-medikiosk}
+      KC_DB_USERNAME: ${POSTGRES_SUPERUSER:-medikiosk_owner}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:-devonly_change_me}
+      KC_DB_SCHEMA: keycloak
+      KC_HEALTH_ENABLED: "true"
+      KC_HOSTNAME_STRICT: "false"
+    ports:
+      - "${KEYCLOAK_PORT:-8080}:8080"
+    volumes:
+      - ../keycloak/realm-medikiosk.json:/opt/keycloak/data/import/realm-medikiosk.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # Keycloak 26 images have no curl; use the JVM-side health endpoint probe.
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080 && echo -e 'GET /realms/medikiosk HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | head -1 | grep -q 200"]
+      interval: 10s
+      timeout: 10s
+      retries: 40
+      start_period: 40s
+    logging: *default-logging
+
+  # ---------------------------------------------------------------------------
+  # OPA — resource-level authorization (§5.1, §29). Deny by default.
+  # ---------------------------------------------------------------------------
+  opa:
+    image: openpolicyagent/opa:0.68.0
+    container_name: medikiosk-opa
+    restart: unless-stopped
+    command:
+      - run
+      - --server
+      - --addr=0.0.0.0:8181
+      - --log-level=info
+      - --set=decision_logs.console=true
+      - /policies
+    ports:
+      - "${OPA_PORT:-8181}:8181"
+    volumes:
+      - ../../policies/opa:/policies:ro
+    healthcheck:
+      test: ["CMD", "/opa", "version"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging: *default-logging
+
+  # ---------------------------------------------------------------------------
+  # MinIO — document object storage (S3-compatible). Encryption at rest is
+  # KMS/Vault-managed in production (§32); dev uses the local keystore.
+  # ---------------------------------------------------------------------------
+  minio:
+    image: minio/minio:RELEASE.2024-09-22T00-33-43Z
+    container_name: medikiosk-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-medikiosk}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-devonly_change_me}
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    logging: *default-logging
+
+  # ---------------------------------------------------------------------------
+  # ClamAV — malware scan BEFORE a document enters the OCR pipeline
+  # [RED LINE §35].
+  # ---------------------------------------------------------------------------
+  clamav:
+    image: clamav/clamav:1.4
+    container_name: medikiosk-clamav
+    restart: unless-stopped
+    ports:
+      - "${CLAMAV_PORT:-3310}:3310"
+    volumes:
+      - clamav-data:/var/lib/clamav
+    healthcheck:
+      test: ["CMD-SHELL", "clamdcheck.sh || exit 1"]
+      interval: 30s
+      timeout: 20s
+      retries: 20
+      start_period: 180s
+    logging: *default-logging
+
+  # ---------------------------------------------------------------------------
+  # OpenTelemetry Collector — the SINGLE redaction choke point (§28).
+  # No telemetry reaches a backend without passing through here.
+  # ---------------------------------------------------------------------------
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.109.0
+    container_name: medikiosk-otel
+    restart: unless-stopped
+    command: ["--config=/etc/otel/config.yaml"]
+    volumes:
+      - ../otel/collector-config.yaml:/etc/otel/config.yaml:ro
+    ports:
+      - "${OTLP_GRPC_PORT:-4317}:4317"
+      - "${OTLP_HTTP_PORT:-4318}:4318"
+      - "8889:8889"   # prometheus scrape
+    logging: *default-logging
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: medikiosk-prometheus
+    restart: unless-stopped
+    volumes:
+      - ../otel/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    logging: *default-logging
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: medikiosk-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-devonly_change_me}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ../otel/grafana-provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    depends_on:
+      - prometheus
+    logging: *default-logging
+
+  # ===========================================================================
+  # Application services (profile: app)
+  # ===========================================================================
+
+  api:
+    build:
+      context: ../..
+      dockerfile: infra/docker/api.Dockerfile
+    container_name: medikiosk-api
+    restart: unless-stopped
+    profiles: ["app"]
+    env_file:
+      - ../../.env
+    environment:
+      MEDIKIOSK_DATABASE_URL: postgresql://medikiosk_app:${APP_DB_PASSWORD:-medikiosk_app}@postgres:5432/${POSTGRES_DB:-medikiosk}
+      MEDIKIOSK_REDIS_URL: redis://redis:6379/0
+      MEDIKIOSK_RABBITMQ_URL: amqp://${RABBITMQ_USER:-medikiosk}:${RABBITMQ_PASSWORD:-devonly_change_me}@rabbitmq:5672/
+      MEDIKIOSK_OIDC_ISSUER: http://keycloak:8080/realms/medikiosk
+      MEDIKIOSK_OPA_URL: http://opa:8181
+      MEDIKIOSK_S3_ENDPOINT: http://minio:9000
+      MEDIKIOSK_CLAMAV_HOST: clamav
+      MEDIKIOSK_OTLP_ENDPOINT: http://otel-collector:4317
+      MEDIKIOSK_AI_GATEWAY_URL: http://ai-gateway:8100
+    # The API is the ONLY service on both networks: it is the bridge between the
+    # data tier and the AI tier, and the only writer to the database (§20).
+    networks:
+      - default
+      - ai-net
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      opa:
+        condition: service_started
+    logging: *default-logging
+
+  # ---------------------------------------------------------------------------
+  # AI Gateway — [RED LINE §20] NO network route to PostgreSQL. It is attached
+  # only to the ai-net bridge; postgres is not on that network. This is the
+  # network-layer half of the isolation control; the code-layer half is that the
+  # service has no DB client, and CI fails the build if a connection string
+  # appears in its config (§61).
+  # ---------------------------------------------------------------------------
+  ai-gateway:
+    build:
+      context: ../..
+      dockerfile: infra/docker/ai-gateway.Dockerfile
+    container_name: medikiosk-ai-gateway
+    restart: unless-stopped
+    profiles: ["app"]
+    environment:
+      MEDIKIOSK_AI_BHASHINI_URL: ${BHASHINI_URL:-}
+      MEDIKIOSK_AI_BHASHINI_KEY: ${BHASHINI_API_KEY:-}
+      MEDIKIOSK_AI_GCP_DOCAI_PROCESSOR: ${GCP_DOCAI_PROCESSOR:-}
+      MEDIKIOSK_AI_LLM_PROVIDER: ${AI_LLM_PROVIDER:-anthropic}
+      MEDIKIOSK_AI_LLM_API_KEY: ${AI_LLM_API_KEY:-}
+    networks:
+      - ai-net
+    ports:
+      - "${AI_GATEWAY_PORT:-8100}:8100"
+    logging: *default-logging
+
+  document-worker:
+    build:
+      context: ../..
+      dockerfile: infra/docker/worker.Dockerfile
+    container_name: medikiosk-document-worker
+    restart: unless-stopped
+    profiles: ["app"]
+    command: ["python", "-m", "medikiosk_workers.document_processing"]
+    env_file:
+      - ../../.env
+    environment:
+      MEDIKIOSK_DATABASE_URL: postgresql://medikiosk_app:${APP_DB_PASSWORD:-medikiosk_app}@postgres:5432/${POSTGRES_DB:-medikiosk}
+      MEDIKIOSK_RABBITMQ_URL: amqp://${RABBITMQ_USER:-medikiosk}:${RABBITMQ_PASSWORD:-devonly_change_me}@rabbitmq:5672/
+      MEDIKIOSK_API_INTERNAL_URL: http://api:8000
+      MEDIKIOSK_AI_GATEWAY_URL: http://ai-gateway:8100
+      MEDIKIOSK_S3_ENDPOINT: http://minio:9000
+      MEDIKIOSK_CLAMAV_HOST: clamav
+    # Needs the AI tier for OCR and the data tier to persist results; like the
+    # API it never lets AI output reach the DB without validation (§17.2, §20).
+    networks:
+      - default
+      - ai-net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    logging: *default-logging
+
+  integration-relay:
+    build:
+      context: ../..
+      dockerfile: infra/docker/worker.Dockerfile
+    container_name: medikiosk-integration-relay
+    restart: unless-stopped
+    profiles: ["app"]
+    command: ["python", "-m", "medikiosk_workers.integration_relay"]
+    env_file:
+      - ../../.env
+    environment:
+      # The relay connects as the starved medikiosk_relay role (outbox only).
+      MEDIKIOSK_RELAY_DATABASE_URL: postgresql://medikiosk_relay:${RELAY_DB_PASSWORD:-medikiosk_relay}@postgres:5432/${POSTGRES_DB:-medikiosk}
+      MEDIKIOSK_RABBITMQ_URL: amqp://${RABBITMQ_USER:-medikiosk}:${RABBITMQ_PASSWORD:-devonly_change_me}@rabbitmq:5672/
+      MEDIKIOSK_API_INTERNAL_URL: http://api:8000
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    logging: *default-logging
+
+  kiosk-frontend:
+    build:
+      context: ../..
+      dockerfile: infra/docker/frontend.Dockerfile
+      args:
+        APP_DIR: apps/kiosk-frontend
+    container_name: medikiosk-kiosk-frontend
+    restart: unless-stopped
+    profiles: ["app"]
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL:-http://localhost:8000}
+    ports:
+      - "${KIOSK_PORT:-3100}:3000"
+    logging: *default-logging
+
+  staff-frontend:
+    build:
+      context: ../..
+      dockerfile: infra/docker/frontend.Dockerfile
+      args:
+        APP_DIR: apps/staff-frontend
+    container_name: medikiosk-staff-frontend
+    restart: unless-stopped
+    profiles: ["app"]
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL:-http://localhost:8000}
+      NEXT_PUBLIC_OIDC_ISSUER: ${PUBLIC_OIDC_ISSUER:-http://localhost:8080/realms/medikiosk}
+    ports:
+      - "${STAFF_PORT:-3200}:3000"
+    logging: *default-logging
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: medikiosk-nginx
+    restart: unless-stopped
+    profiles: ["app"]
+    volumes:
+      - ../nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    depends_on:
+      - api
+      - kiosk-frontend
+      - staff-frontend
+    logging: *default-logging
+
+volumes:
+  postgres-data:
+  rabbitmq-data:
+  minio-data:
+  clamav-data:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  default:
+    name: medikiosk-net
+  # AI workers live here and ONLY here. PostgreSQL is not attached, so there is
+  # no route from an AI container to the database (§20 [RED LINE]).
+  ai-net:
+    name: medikiosk-ai-net

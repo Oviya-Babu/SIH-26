@@ -1,0 +1,926 @@
+{
+  "$comment": [
+    "MediKiosk governed clinical content — ayush_ayurveda v1 (CLAUDE.md §12).",
+    "",
+    "This protocol EXTENDS general_medicine v1. It is not a second system: the",
+    "same engine binary executes both, and the inherited gm.* fields (SOCRATES,",
+    "ROS, PMH/PSH, drug/allergy, family history, and the AMPLE fast path) are the",
+    "identical, once-authored, once-translated content. Only C and F are extended,",
+    "exactly as §12 specifies.",
+    "",
+    "CLINICAL SCOPE NOTE — Dashavidha Pariksha is classically a PRACTITIONER",
+    "examination. What a kiosk can honestly collect is the patient-reportable",
+    "component: history, self-described constitution indicators, Ahara-Vihara and",
+    "Nidana. Each such fact is written as a dashavidha_parameter with",
+    "source_type=patient_answer and reaches the practitioner as an UNVERIFIED",
+    "intake indicator to be confirmed or corrected at examination — never as a",
+    "determined Prakriti. Determination remains the practitioner's act (§21).",
+    "",
+    "Adding Siddha/Unani/Homeopathy later is a further protocol data file and an",
+    "i18n bundle — zero engine change (§12).",
+    "",
+    "LANGUAGE-NEUTRAL BY CONTRACT: no patient-facing text in this file."
+  ],
+  "protocol_family": "ayush_ayurveda",
+  "version": "v1",
+  "extends": {
+    "family": "general_medicine",
+    "version": "v1"
+  },
+  "governance": {
+    "authored_by": "AYUSH Clinical Governance reviewers",
+    "review_state": "prototype_pending_board_ratification",
+    "framework": "Dashavidha Pariksha + Ahara-Vihara + Nidana + Samprapti, layered on the general history"
+  },
+  "concepts": [
+    {
+      "code": "prakriti_indicator",
+      "category": "dashavidha_parameter"
+    },
+    {
+      "code": "vikriti_indicator",
+      "category": "dashavidha_parameter"
+    },
+    {
+      "code": "sara_indicator",
+      "category": "dashavidha_parameter"
+    },
+    {
+      "code": "samhanana_indicator",
+      "category": "dashavidha_parameter"
+    },
+    {
+      "code": "pramana_measure",
+      "category": "dashavidha_parameter"
+    },
+    {
+      "code": "satmya_indicator",
+      "category": "dashavidha_parameter"
+    },
+    {
+      "code": "sattva_indicator",
+      "category": "dashavidha_parameter"
+    },
+    {
+      "code": "ahara_shakti",
+      "category": "dashavidha_parameter"
+    },
+    {
+      "code": "vyayama_shakti",
+      "category": "dashavidha_parameter"
+    },
+    {
+      "code": "vaya_stage",
+      "category": "dashavidha_parameter"
+    },
+    {
+      "code": "ahara_rasa_preference",
+      "category": "ahara_vihara"
+    },
+    {
+      "code": "ahara_regularity",
+      "category": "ahara_vihara"
+    },
+    {
+      "code": "jala_intake",
+      "category": "ahara_vihara"
+    },
+    {
+      "code": "nidra_pattern",
+      "category": "ahara_vihara"
+    },
+    {
+      "code": "dinacharya_adherence",
+      "category": "ahara_vihara"
+    },
+    {
+      "code": "vega_dharana",
+      "category": "ahara_vihara"
+    },
+    {
+      "code": "nidana_factor",
+      "category": "nidana"
+    },
+    {
+      "code": "nidana_ritu",
+      "category": "nidana"
+    },
+    {
+      "code": "samprapti_progression",
+      "category": "samprapti"
+    }
+  ],
+  "fields": [
+    {
+      "$comment": "Dashavidha Pariksha 1/10 — Prakriti. Decomposed into patient-reportable indicators; the practitioner determines Prakriti from these plus examination.",
+      "id": "ay.dv.prakriti.body_frame",
+      "concept_code": "prakriti_indicator",
+      "category": "dashavidha_parameter",
+      "group": "dashavidha_prakriti",
+      "order": 1000,
+      "required": true,
+      "value_type": "single_select",
+      "widget": "choice_grid",
+      "options": [
+        {
+          "value": "thin_light",
+          "icon": "body_thin"
+        },
+        {
+          "value": "medium_muscular",
+          "icon": "body_medium"
+        },
+        {
+          "value": "heavy_broad",
+          "icon": "body_heavy"
+        }
+      ]
+    },
+    {
+      "id": "ay.dv.prakriti.skin_nature",
+      "concept_code": "prakriti_indicator",
+      "category": "dashavidha_parameter",
+      "group": "dashavidha_prakriti",
+      "order": 1010,
+      "required": true,
+      "value_type": "single_select",
+      "widget": "choice_grid",
+      "options": [
+        {
+          "value": "dry_rough",
+          "icon": "skin_dry"
+        },
+        {
+          "value": "warm_oily",
+          "icon": "skin_oily"
+        },
+        {
+          "value": "cool_smooth",
+          "icon": "skin_smooth"
+        }
+      ]
+    },
+    {
+      "id": "ay.dv.prakriti.appetite_nature",
+      "concept_code": "prakriti_indicator",
+      "category": "dashavidha_parameter",
+      "group": "dashavidha_prakriti",
+      "order": 1020,
+      "required": true,
+      "value_type": "single_select",
+      "widget": "choice_grid",
+      "options": [
+        {
+          "value": "irregular_variable",
+          "icon": "plate_variable"
+        },
+        {
+          "value": "strong_cannot_skip",
+          "icon": "plate_full"
+        },
+        {
+          "value": "steady_but_slow",
+          "icon": "plate_slow"
+        }
+      ]
+    },
+    {
+      "id": "ay.dv.prakriti.temperament",
+      "concept_code": "prakriti_indicator",
+      "category": "dashavidha_parameter",
+      "group": "dashavidha_prakriti",
+      "order": 1030,
+      "required": true,
+      "value_type": "single_select",
+      "widget": "choice_grid",
+      "options": [
+        {
+          "value": "quick_restless",
+          "icon": "mind_quick"
+        },
+        {
+          "value": "focused_intense",
+          "icon": "mind_intense"
+        },
+        {
+          "value": "calm_steady",
+          "icon": "mind_calm"
+        }
+      ]
+    },
+    {
+      "id": "ay.dv.prakriti.tolerance_to_climate",
+      "concept_code": "prakriti_indicator",
+      "category": "dashavidha_parameter",
+      "group": "dashavidha_prakriti",
+      "order": 1040,
+      "required": true,
+      "value_type": "single_select",
+      "widget": "choice_grid",
+      "options": [
+        {
+          "value": "dislikes_cold_and_wind",
+          "icon": "cold"
+        },
+        {
+          "value": "dislikes_heat",
+          "icon": "heat"
+        },
+        {
+          "value": "dislikes_damp_and_cold",
+          "icon": "damp"
+        },
+        {
+          "value": "no_strong_dislike",
+          "icon": "none"
+        }
+      ]
+    },
+    {
+      "$comment": "2/10 — Vikriti: the current deviation from the patient's usual state.",
+      "id": "ay.dv.vikriti.current_disturbance",
+      "concept_code": "vikriti_indicator",
+      "category": "dashavidha_parameter",
+      "group": "dashavidha_vikriti",
+      "order": 1100,
+      "required": true,
+      "value_type": "multi_select",
+      "widget": "multi_choice_grid",
+      "options": [
+        {
+          "value": "bloating_or_gas",
+          "icon": "abdomen"
+        },
+        {
+          "value": "dryness_or_stiffness",
+          "icon": "skin_dry"
+        },
+        {
+          "value": "burning_or_acidity",
+          "icon": "burn"
+        },
+        {
+          "value": "excess_heat_or_anger",
+          "icon": "heat"
+        },
+        {
+          "value": "heaviness_or_congestion",
+          "icon": "heavy"
+        },
+        {
+          "value": "excess_sleep_or_lethargy",
+          "icon": "sleep"
+        },
+        {
+          "value": "loss_of_taste",
+          "icon": "tongue"
+        },
+        {
+          "value": "coating_on_tongue",
+          "icon": "tongue"
+        },
+        {
+          "value": "none_of_these",
+          "icon": "none",
+          "exclusive": true
+        }
+      ]
+    },
+    {
+      "$comment": "3/10 — Sara: tissue quality, approached through stamina and recovery.",
+      "id": "ay.dv.sara.stamina",
+      "concept_code": "sara_indicator",
+      "category": "dashavidha_parameter",
+      "group": "dashavidha_bala",
+      "order": 1200,
+      "required": true,
+      "value_type": "single_select",
+      "widget": "choice_grid",
+      "options": [
+        {
+          "value": "strong_recovers_quickly",
+          "icon": "strong"
+        },
+        {
+          "value": "average",
+          "icon": "medium"
+        },
+        {
+          "value": "tires_easily",
+          "icon": "tired"
+        },
+        {
+          "value": "very_weak",
+          "icon": "weak",
+          "critical": true
+        }
+      ],
+      "red_flag_input": true
+    },
+    {
+      "$comment": "4/10 — Samhanana: body compactness/proportion.",
+      "id": "ay.dv.samhanana.build_quality",
+      "concept_code": "samhanana_indicator",
+      "category": "dashavidha_parameter",
+      "group": "dashavidha_bala",
+      "order": 1210,
+      "required": true,
+      "value_type": "single_select",
+      "widget": "choice_grid",
+      "options": [
+        {
+          "value": "well_built_firm",
+          "icon": "body_firm"
+        },
+        {
+          "value": "average_build",
+          "icon": "body_medium"
+        },
+        {
+          "value": "loose_or_flabby",
+          "icon": "body_loose"
+        },
+        {
+          "value": "recently_lost_weight",
+          "icon": "scale_down",
+          "critical": true
+        }
+      ]
+    },
+    {
+      "$comment": "5/10 — Pramana: anthropometry. Deterministic values, not impressions.",
+      "id": "ay.dv.pramana.height_cm",
+      "concept_code": "pramana_measure",
+      "category": "dashavidha_parameter",
+      "group": "dashavidha_bala",
+      "order": 1220,
+      "value_type": "number",
+      "widget": "number_pad",
+      "validation": {
+        "min": 40,
+        "max": 230,
+        "units": [
+          "cm"
+        ]
+      }
+    },
+    {
+      "id": "ay.dv.pramana.weight_kg",
+      "concept_code": "pramana_measure",
+      "category": "dashavidha_parameter",
+      "group": "dashavidha_bala",
+      "order": 1230,
+      "value_type": "number",
+      "widget": "number_pad",
+      "validation": {
+        "min": 2,
+        "max": 300,
+        "units": [
+          "kg"
+        ]
+      }
+    },
+    {
+      "$comment": "6/10 — Satmya: habituation and tolerance.",
+      "id": "ay.dv.satmya.tolerances",
+      "concept_code": "satmya_indicator",
+      "category": "dashavidha_parameter",
+      "group": "dashavidha_bala",
+      "order": 1240,
+      "required": true,
+      "value_type": "multi_select",
+      "widget": "multi_choice_grid",
+      "options": [
+        {
+          "value": "cannot_tolerate_spicy",
+          "icon": "chilli"
+        },
+        {
+          "value": "cannot_tolerate_oily",
+          "icon": "oil"
+        },
+        {
+          "value": "cannot_tolerate_milk",
+          "icon": "milk"
+        },
+        {
+          "value": "cannot_tolerate_curd",
+          "icon": "curd"
+        },
+        {
+          "value": "cannot_tolerate_cold_food",
+          "icon": "cold"
+        },
+        {
+          "value": "cannot_skip_meals",
+          "icon": "plate_full"
+        },
+        {
+          "value": "tolerates_everything",
+          "icon": "none",
+          "exclusive": true
+        }
+      ]
+    },
+    {
+      "$comment": "7/10 — Sattva: mental strength/resilience.",
+      "id": "ay.dv.sattva.mental_resilience",
+      "concept_code": "sattva_indicator",
+      "category": "dashavidha_parameter",
+      "group": "dashavidha_bala",
+      "order": 1250,
+      "required": true,
+      "value_type": "single_select",
+      "widget": "choice_grid",
+      "options": [
+        {
+          "value": "handles_stress_well",
+          "icon": "mind_calm"
+        },
+        {
+          "value": "manages_with_effort",
+          "icon": "mind_effort"
+        },
+        {
+          "value": "easily_disturbed",
+          "icon": "mind_quick"
+        },
+        {
+          "value": "very_anxious_or_low",
+          "icon": "mind_low",
+          "critical": true
+        }
+      ]
+    },
+    {
+      "$comment": "8/10 — Ahara Shakti: digestive and intake capacity.",
+      "id": "ay.dv.ahara_shakti.capacity",
+      "concept_code": "ahara_shakti",
+      "category": "dashavidha_parameter",
+      "group": "dashavidha_shakti",
+      "order": 1300,
+      "required": true,
+      "value_type": "single_select",
+      "widget": "choice_grid",
+      "options": [
+        {
+          "value": "good_appetite_good_digestion",
+          "icon": "plate_full"
+        },
+        {
+          "value": "good_appetite_poor_digestion",
+          "icon": "plate_heavy"
+        },
+        {
+          "value": "poor_appetite",
+          "icon": "plate_low"
+        },
+        {
+          "value": "no_appetite_at_all",
+          "icon": "empty_plate",
+          "critical": true
+        }
+      ],
+      "red_flag_input": true
+    },
+    {
+      "id": "ay.dv.ahara_shakti.bowel_pattern",
+      "concept_code": "ahara_shakti",
+      "category": "dashavidha_parameter",
+      "group": "dashavidha_shakti",
+      "order": 1310,
+      "required": true,
+      "value_type": "single_select",
+      "widget": "choice_grid",
+      "options": [
+        {
+          "value": "regular_once_daily",
+          "icon": "check"
+        },
+        {
+          "value": "hard_or_infrequent",
+          "icon": "intestine"
+        },
+        {
+          "value": "loose_or_frequent",
+          "icon": "intestine"
+        },
+        {
+          "value": "alternating",
+          "icon": "swap"
+        }
+      ]
+    },
+    {
+      "$comment": "9/10 — Vyayama Shakti: exercise capacity.",
+      "id": "ay.dv.vyayama_shakti.capacity",
+      "concept_code": "vyayama_shakti",
+      "category": "dashavidha_parameter",
+      "group": "dashavidha_shakti",
+      "order": 1320,
+      "required": true,
+      "value_type": "single_select",
+      "widget": "choice_grid",
+      "options": [
+        {
+          "value": "can_exert_without_difficulty",
+          "icon": "run"
+        },
+        {
+          "value": "moderate_exertion_only",
+          "icon": "walk"
+        },
+        {
+          "value": "breathless_on_mild_exertion",
+          "icon": "lungs",
+          "critical": true
+        },
+        {
+          "value": "cannot_exert_at_all",
+          "icon": "weak",
+          "critical": true
+        }
+      ],
+      "red_flag_input": true
+    },
+    {
+      "$comment": "10/10 — Vaya: life stage. Asked, not inferred, because a stated age may be approximate.",
+      "id": "ay.dv.vaya.life_stage",
+      "concept_code": "vaya_stage",
+      "category": "dashavidha_parameter",
+      "group": "dashavidha_shakti",
+      "order": 1330,
+      "required": true,
+      "value_type": "single_select",
+      "widget": "choice_grid",
+      "options": [
+        {
+          "value": "bala_childhood",
+          "icon": "child"
+        },
+        {
+          "value": "madhya_adult",
+          "icon": "adult"
+        },
+        {
+          "value": "vriddha_elderly",
+          "icon": "elder"
+        }
+      ]
+    },
+    {
+      "id": "ay.av.rasa_preference",
+      "concept_code": "ahara_rasa_preference",
+      "category": "ahara_vihara",
+      "group": "ahara_vihara",
+      "order": 1400,
+      "required": true,
+      "value_type": "multi_select",
+      "widget": "multi_choice_grid",
+      "options": [
+        {
+          "value": "madhura_sweet",
+          "icon": "taste_sweet"
+        },
+        {
+          "value": "amla_sour",
+          "icon": "taste_sour"
+        },
+        {
+          "value": "lavana_salty",
+          "icon": "taste_salty"
+        },
+        {
+          "value": "katu_pungent",
+          "icon": "taste_pungent"
+        },
+        {
+          "value": "tikta_bitter",
+          "icon": "taste_bitter"
+        },
+        {
+          "value": "kashaya_astringent",
+          "icon": "taste_astringent"
+        }
+      ]
+    },
+    {
+      "id": "ay.av.meal_regularity",
+      "concept_code": "ahara_regularity",
+      "category": "ahara_vihara",
+      "group": "ahara_vihara",
+      "order": 1410,
+      "required": true,
+      "value_type": "single_select",
+      "widget": "choice_grid",
+      "options": [
+        {
+          "value": "fixed_times_daily",
+          "icon": "clock"
+        },
+        {
+          "value": "usually_regular",
+          "icon": "clock"
+        },
+        {
+          "value": "often_irregular",
+          "icon": "clock_alert"
+        },
+        {
+          "value": "skips_meals_frequently",
+          "icon": "empty_plate",
+          "critical": true
+        }
+      ]
+    },
+    {
+      "id": "ay.av.water_intake",
+      "concept_code": "jala_intake",
+      "category": "ahara_vihara",
+      "group": "ahara_vihara",
+      "order": 1420,
+      "required": true,
+      "value_type": "single_select",
+      "widget": "choice_grid",
+      "options": [
+        {
+          "value": "less_than_1_litre",
+          "icon": "drop_low"
+        },
+        {
+          "value": "one_to_two_litres",
+          "icon": "drop"
+        },
+        {
+          "value": "more_than_two_litres",
+          "icon": "drop_high"
+        },
+        {
+          "value": "not_sure",
+          "icon": "unsure"
+        }
+      ]
+    },
+    {
+      "id": "ay.av.nidra_pattern",
+      "concept_code": "nidra_pattern",
+      "category": "ahara_vihara",
+      "group": "ahara_vihara",
+      "order": 1430,
+      "required": true,
+      "value_type": "multi_select",
+      "widget": "multi_choice_grid",
+      "options": [
+        {
+          "value": "sleeps_late_at_night",
+          "icon": "moon"
+        },
+        {
+          "value": "sleeps_during_the_day",
+          "icon": "sun"
+        },
+        {
+          "value": "disturbed_sleep",
+          "icon": "bed"
+        },
+        {
+          "value": "excess_sleep",
+          "icon": "sleep"
+        },
+        {
+          "value": "sleep_is_regular",
+          "icon": "check",
+          "exclusive": true
+        }
+      ]
+    },
+    {
+      "id": "ay.av.dinacharya",
+      "concept_code": "dinacharya_adherence",
+      "category": "ahara_vihara",
+      "group": "ahara_vihara",
+      "order": 1440,
+      "value_type": "multi_select",
+      "widget": "multi_choice_grid",
+      "options": [
+        {
+          "value": "wakes_before_sunrise",
+          "icon": "sunrise"
+        },
+        {
+          "value": "oil_massage_regularly",
+          "icon": "oil"
+        },
+        {
+          "value": "yoga_or_pranayama",
+          "icon": "yoga"
+        },
+        {
+          "value": "regular_bathing_routine",
+          "icon": "water"
+        },
+        {
+          "value": "no_fixed_routine",
+          "icon": "none",
+          "exclusive": true
+        }
+      ]
+    },
+    {
+      "id": "ay.av.vega_dharana",
+      "concept_code": "vega_dharana",
+      "category": "ahara_vihara",
+      "group": "ahara_vihara",
+      "order": 1450,
+      "required": true,
+      "value_type": "multi_select",
+      "widget": "multi_choice_grid",
+      "options": [
+        {
+          "value": "holds_urine",
+          "icon": "kidney"
+        },
+        {
+          "value": "holds_stool",
+          "icon": "intestine"
+        },
+        {
+          "value": "suppresses_sneeze_or_cough",
+          "icon": "cough"
+        },
+        {
+          "value": "suppresses_hunger_or_thirst",
+          "icon": "empty_plate"
+        },
+        {
+          "value": "suppresses_sleep",
+          "icon": "moon"
+        },
+        {
+          "value": "does_not_suppress",
+          "icon": "none",
+          "exclusive": true
+        }
+      ]
+    },
+    {
+      "id": "ay.nid.causative_factors",
+      "concept_code": "nidana_factor",
+      "category": "nidana",
+      "group": "nidana",
+      "order": 1500,
+      "required": true,
+      "value_type": "multi_select",
+      "widget": "multi_choice_grid",
+      "options": [
+        {
+          "value": "change_in_diet",
+          "icon": "food"
+        },
+        {
+          "value": "excess_travel_or_exertion",
+          "icon": "walk"
+        },
+        {
+          "value": "mental_stress_or_grief",
+          "icon": "mind_low"
+        },
+        {
+          "value": "seasonal_change",
+          "icon": "season"
+        },
+        {
+          "value": "exposure_to_cold_or_damp",
+          "icon": "cold"
+        },
+        {
+          "value": "night_awakening",
+          "icon": "moon"
+        },
+        {
+          "value": "suppression_of_natural_urges",
+          "icon": "warn"
+        },
+        {
+          "value": "after_an_illness",
+          "icon": "thermometer"
+        },
+        {
+          "value": "not_sure",
+          "icon": "unsure",
+          "exclusive": true
+        }
+      ]
+    },
+    {
+      "id": "ay.nid.onset_season",
+      "concept_code": "nidana_ritu",
+      "category": "nidana",
+      "group": "nidana",
+      "order": 1510,
+      "value_type": "single_select",
+      "widget": "choice_grid",
+      "options": [
+        {
+          "value": "shishira_winter",
+          "icon": "cold"
+        },
+        {
+          "value": "vasanta_spring",
+          "icon": "leaf"
+        },
+        {
+          "value": "grishma_summer",
+          "icon": "heat"
+        },
+        {
+          "value": "varsha_monsoon",
+          "icon": "rain"
+        },
+        {
+          "value": "sharad_autumn",
+          "icon": "season"
+        },
+        {
+          "value": "not_sure",
+          "icon": "unsure"
+        }
+      ]
+    },
+    {
+      "$comment": "Samprapti — asked in plain language about how the illness evolved; the practitioner maps this to the Shatkriyakala stage. The kiosk never names a stage on the patient's behalf.",
+      "id": "ay.sam.progression_pattern",
+      "concept_code": "samprapti_progression",
+      "category": "samprapti",
+      "group": "samprapti",
+      "order": 1600,
+      "required": true,
+      "value_type": "single_select",
+      "widget": "choice_grid",
+      "options": [
+        {
+          "value": "vague_discomfort_only",
+          "icon": "line_flat"
+        },
+        {
+          "value": "clear_symptoms_recently",
+          "icon": "line_up"
+        },
+        {
+          "value": "symptoms_moved_to_other_areas",
+          "icon": "spread"
+        },
+        {
+          "value": "settled_in_one_area",
+          "icon": "target"
+        },
+        {
+          "value": "long_standing_and_fixed",
+          "icon": "calendar"
+        },
+        {
+          "value": "with_complications",
+          "icon": "alert",
+          "critical": true
+        }
+      ]
+    },
+    {
+      "id": "ay.sam.previous_ayush_treatment",
+      "concept_code": "samprapti_progression",
+      "category": "samprapti",
+      "group": "samprapti",
+      "order": 1610,
+      "required": true,
+      "value_type": "multi_select",
+      "widget": "multi_choice_grid",
+      "options": [
+        {
+          "value": "ayurvedic_medicines",
+          "icon": "herb"
+        },
+        {
+          "value": "panchakarma",
+          "icon": "oil"
+        },
+        {
+          "value": "yoga_therapy",
+          "icon": "yoga"
+        },
+        {
+          "value": "home_remedies",
+          "icon": "home"
+        },
+        {
+          "value": "allopathic_treatment",
+          "icon": "pill"
+        },
+        {
+          "value": "no_treatment_yet",
+          "icon": "none",
+          "exclusive": true
+        }
+      ]
+    }
+  ]
+}
