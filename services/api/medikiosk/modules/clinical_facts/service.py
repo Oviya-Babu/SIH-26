@@ -20,7 +20,7 @@ from uuid import UUID
 
 import asyncpg
 
-from medikiosk.db import Principal, as_json
+from medikiosk.db import Principal, to_jsonb
 from medikiosk.errors import Conflict, NotFound, ValidationFailed
 from medikiosk.modules.audit import service as audit
 
@@ -145,13 +145,13 @@ async def write(
         fact.concept_code,
         fact.concept_label,
         fact.value_raw,
-        as_json(fact.value_normalized),
+        to_jsonb(fact.value_normalized),
         fact.unit,
         fact.confidence,
         str(fact.source_type),
         fact.respondent_id,
         fact.respondent_relationship,
-        as_json(fact.provenance_ref),
+        to_jsonb(fact.provenance_ref),
         str(fact.verification_status),
         fact.abnormal_flag,
     )

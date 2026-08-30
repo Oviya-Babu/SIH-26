@@ -170,7 +170,7 @@ BEGIN
     IF v_basis NOT IN ('documented_guardianship',
                        'documented_medical_power_of_attorney') THEN
         RAISE EXCEPTION
-            'caregiver may not grant consent under basis %% (CLAUDE.md §6 [RED LINE])', v_basis;
+            'caregiver may not grant consent under basis % (CLAUDE.md §6 [RED LINE])', v_basis;
     END IF;
 
     RETURN NEW;

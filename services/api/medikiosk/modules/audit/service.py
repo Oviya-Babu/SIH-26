@@ -17,7 +17,7 @@ from uuid import UUID
 
 import asyncpg
 
-from medikiosk.db import Principal, as_json
+from medikiosk.db import Principal, to_jsonb
 
 # Keys permitted in audit detail. Deliberately narrow: an audit row records
 # *that* something happened and to which entity, not the clinical content.
@@ -140,7 +140,7 @@ async def record(
         action,
         entity_type,
         entity_id,
-        as_json(sanitise_detail(detail)),
+        to_jsonb(sanitise_detail(detail)),
     )
     return int(row["id"])
 

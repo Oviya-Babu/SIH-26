@@ -23,7 +23,7 @@ from uuid import UUID
 
 import asyncpg
 
-from medikiosk.db import Principal, as_json
+from medikiosk.db import Principal, to_jsonb
 from medikiosk.observability.logging_setup import get_logger
 
 log = get_logger(__name__)
@@ -126,7 +126,7 @@ async def rebuild(
             derived.value,
             derived.precision if known else None,
             row["concept_label"],
-            as_json(
+            to_jsonb(
                 {
                     "category": row["category"],
                     "concept_code": row["concept_code"],

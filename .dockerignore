@@ -1,0 +1,15 @@
+# Keep build context small and secrets out of it.
+.git
+.env
+.env.*
+!.env.example
+**/.venv
+**/node_modules
+**/__pycache__
+**/.next
+**/.pytest_cache
+**/.ruff_cache
+**/.mypy_cache
+_legacy_snapshot
+*.log
+infra/terraform/.terraform

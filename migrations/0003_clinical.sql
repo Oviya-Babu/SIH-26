@@ -486,7 +486,7 @@ BEGIN
 
     IF NOT (NEW.status = ANY (allowed)) THEN
         RAISE EXCEPTION
-            'illegal physician_review transition %% -> %% (CLAUDE.md §21 [RED LINE])',
+            'illegal physician_review transition % -> % (CLAUDE.md §21 [RED LINE])',
             OLD.status, NEW.status;
     END IF;
 
@@ -510,7 +510,7 @@ BEGIN
 
     IF v_status = 'exported' THEN
         RAISE EXCEPTION
-            'session %% is exported; clinical facts are sealed (CLAUDE.md §21)', NEW.session_id;
+            'session % is exported; clinical facts are sealed (CLAUDE.md §21)', NEW.session_id;
     END IF;
     RETURN NEW;
 END
