@@ -1,0 +1,161 @@
+{
+  "$comment": [
+    "Patient-facing strings for ayush_ayurveda v1 (§12).",
+    "Only ay.* fields appear here. The inherited gm.* fields resolve from",
+    "protocol.general_medicine.json — the same question, translated once.",
+    "",
+    "Wording rule for this bundle: ask in everyday language about what the",
+    "patient can actually observe about themselves. Never ask a patient to name",
+    "their own Prakriti or a Samprapti stage — that determination is the",
+    "practitioner's act (§12, §21)."
+  ],
+
+  "groups": {
+    "dashavidha_prakriti": "About your natural body type",
+    "dashavidha_vikriti": "What feels different now",
+    "dashavidha_bala": "Your strength and build",
+    "dashavidha_shakti": "Digestion and capacity",
+    "ahara_vihara": "Food and daily routine",
+    "nidana": "What may have caused it",
+    "samprapti": "How the problem developed"
+  },
+
+  "fields": {
+    "ay.dv.prakriti.body_frame": {
+      "voice_prompt": "First, a few questions about your body's natural nature. How would you describe your body build, as it has been most of your life?",
+      "touch_label": "Your natural body build",
+      "help": "Think about how you have been for most of your life, not just now."
+    },
+    "ay.dv.prakriti.skin_nature": {
+      "voice_prompt": "How is your skin, usually?",
+      "touch_label": "Your skin, usually",
+      "help": "Again, think about how it usually is, not only today."
+    },
+    "ay.dv.prakriti.appetite_nature": {
+      "voice_prompt": "How is your hunger, usually?",
+      "touch_label": "Your hunger, usually",
+      "help": "Think about your normal pattern over the years."
+    },
+    "ay.dv.prakriti.temperament": {
+      "voice_prompt": "How would you describe your nature — how you usually think and feel?",
+      "touch_label": "Your usual nature",
+      "help": "There is no better or worse answer. Choose what fits you."
+    },
+    "ay.dv.prakriti.tolerance_to_climate": {
+      "voice_prompt": "Which kind of weather do you find hardest to bear?",
+      "touch_label": "Weather you cannot bear",
+      "help": "Choose the one that troubles you most."
+    },
+
+    "ay.dv.vikriti.current_disturbance": {
+      "voice_prompt": "Now, what feels different from your usual self these days? You can choose more than one.",
+      "touch_label": "What feels different now?",
+      "help": "This is about the present time, compared with how you normally feel."
+    },
+
+    "ay.dv.sara.stamina": {
+      "voice_prompt": "How is your strength and stamina these days?",
+      "touch_label": "Your strength now",
+      "help": "Think about whether you tire faster than you used to."
+    },
+    "ay.dv.samhanana.build_quality": {
+      "voice_prompt": "How would you describe your body at present?",
+      "touch_label": "Your body at present",
+      "help": "This is about now, including any recent change in weight."
+    },
+    "ay.dv.pramana.height_cm": {
+      "voice_prompt": "What is your height in centimetres, if you know it? You may skip this if you are not sure.",
+      "touch_label": "Your height",
+      "help": "An approximate number is fine. You may skip this question."
+    },
+    "ay.dv.pramana.weight_kg": {
+      "voice_prompt": "What is your weight in kilograms, if you know it? You may skip this if you are not sure.",
+      "touch_label": "Your weight",
+      "help": "An approximate number is fine. You may skip this question."
+    },
+    "ay.dv.satmya.tolerances": {
+      "voice_prompt": "Are there foods or habits that do not suit you?",
+      "touch_label": "What does not suit you?",
+      "help": "This means foods that regularly upset you, not a one-time problem."
+    },
+    "ay.dv.sattva.mental_resilience": {
+      "voice_prompt": "How do you usually cope with worry or difficulty?",
+      "touch_label": "How you cope with worry",
+      "help": "Please answer honestly. This helps the doctor understand you fully."
+    },
+
+    "ay.dv.ahara_shakti.capacity": {
+      "voice_prompt": "How is your hunger and digestion at present?",
+      "touch_label": "Hunger and digestion",
+      "help": "Think about whether you feel hungry, and whether food feels heavy afterwards."
+    },
+    "ay.dv.ahara_shakti.bowel_pattern": {
+      "voice_prompt": "How are your bowel movements?",
+      "touch_label": "Your bowel movements",
+      "help": "Choose the one closest to your usual pattern these days."
+    },
+    "ay.dv.vyayama_shakti.capacity": {
+      "voice_prompt": "How much physical work can you do without difficulty?",
+      "touch_label": "How much work can you do?",
+      "help": "Think about climbing stairs or walking a distance."
+    },
+    "ay.dv.vaya.life_stage": {
+      "voice_prompt": "Which stage of life are you in?",
+      "touch_label": "Your stage of life",
+      "help": "Choose childhood, adult, or old age."
+    },
+
+    "ay.av.rasa_preference": {
+      "voice_prompt": "Which tastes do you like most in your food? You can choose more than one.",
+      "touch_label": "Tastes you like",
+      "help": "Choose the tastes you naturally reach for."
+    },
+    "ay.av.meal_regularity": {
+      "voice_prompt": "Do you eat your meals at regular times?",
+      "touch_label": "Are your meals regular?",
+      "help": "Think about a normal week for you."
+    },
+    "ay.av.water_intake": {
+      "voice_prompt": "About how much water do you drink in a day?",
+      "touch_label": "Water in a day",
+      "help": "One litre is about four glasses."
+    },
+    "ay.av.nidra_pattern": {
+      "voice_prompt": "How is your sleep pattern? You can choose more than one.",
+      "touch_label": "Your sleep pattern",
+      "help": "Include daytime sleep if you take it."
+    },
+    "ay.av.dinacharya": {
+      "voice_prompt": "Do you follow any of these daily practices?",
+      "touch_label": "Your daily practices",
+      "help": "Choose all that you actually do regularly."
+    },
+    "ay.av.vega_dharana": {
+      "voice_prompt": "Do you often hold back any of these natural urges?",
+      "touch_label": "Do you hold back urges?",
+      "help": "For example, holding urine because of work. Choose all that apply."
+    },
+
+    "ay.nid.causative_factors": {
+      "voice_prompt": "What do you think may have brought on this problem?",
+      "touch_label": "What may have caused it?",
+      "help": "Your own idea is useful to the doctor. Choose all that apply, or 'I am not sure'."
+    },
+    "ay.nid.onset_season": {
+      "voice_prompt": "In which season did this problem start?",
+      "touch_label": "Which season did it start?",
+      "help": "You may skip this if you do not remember."
+    },
+
+    "ay.sam.progression_pattern": {
+      "voice_prompt": "How has this problem developed since it began?",
+      "touch_label": "How did it develop?",
+      "help": "Choose whichever is closest to what you have experienced."
+    },
+    "ay.sam.previous_ayush_treatment": {
+      "voice_prompt": "Have you already taken any treatment for this problem?",
+      "touch_label": "Treatment already taken",
+      "help": "Include home remedies and English medicine as well. Choose all that apply."
+    }
+  }
+}

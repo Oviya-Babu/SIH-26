@@ -1,0 +1,89 @@
+{
+  "$comment": [
+    "Internal MediKiosk consent notice (CLAUDE.md §7.2).",
+    "",
+    "This is the notice for MediKiosk's OWN processing. It is deliberately NOT the",
+    "ABDM network consent artifact, which is owned by a registered Consent Manager",
+    "and is a structurally separate object [RED LINE §7.2].",
+    "",
+    "'notice_version' is recorded on every consent row, so it is always provable",
+    "which words a specific patient actually heard. Changing any text below",
+    "REQUIRES bumping notice_version.",
+    "",
+    "Each purpose has a *_spoken script because the notice must be audio-explained",
+    "(§7.2) — a wall of text is not informed consent for a patient who cannot read."
+  ],
+
+  "notice_version": "internal-consent-v1",
+
+  "intro": {
+    "title": "Your permission, before we begin",
+    "spoken": "Before we begin, we must ask your permission. Please listen carefully. You can stop at any time, and you can say no. If you say no, you will still see the doctor — a staff member will simply take your details in person instead.",
+    "who_we_are": "This is {hospital}'s own system. Your information stays with this hospital.",
+    "you_can_say_no": "You can say no. You will still be seen by the doctor.",
+    "you_can_change_your_mind": "You can change your mind later and withdraw your permission."
+  },
+
+  "purposes": {
+    "voice_capture": {
+      "title": "Listening to your voice",
+      "short": "So you can answer by speaking instead of typing",
+      "spoken": "First: may we listen to your voice? This lets you answer by speaking instead of touching the screen. Your recorded voice is turned into text and then deleted immediately — we do not keep the recording.",
+      "detail": "Your voice is converted to text and the recording is deleted straight away. We never keep the audio.",
+      "required": false
+    },
+    "document_processing": {
+      "title": "Reading your medical papers",
+      "short": "So the doctor can see your old prescriptions and reports",
+      "spoken": "Second: may we read the medical papers you show us? We photograph them and read the medicines and test results from them, so the doctor does not have to start from nothing.",
+      "detail": "We photograph your papers and read the medicines, tests and diagnoses from them. The papers become part of your hospital record.",
+      "required": false
+    },
+    "ai_processing": {
+      "title": "Using a computer to prepare your notes",
+      "short": "A computer arranges your answers for the doctor",
+      "spoken": "Third: may a computer help arrange your answers into notes for the doctor? The computer only arranges what you have told us. It does not decide anything about your treatment. Only the doctor decides, and the doctor checks every line.",
+      "detail": "A computer program arranges your answers into notes and suggests wording. It does not diagnose you and it does not decide your treatment. The doctor reviews and confirms everything.",
+      "required": false
+    },
+    "staff_access": {
+      "title": "Letting the hospital staff see your answers",
+      "short": "So the nurse and doctor treating you can read your answers",
+      "spoken": "Fourth, and this one is necessary: may the nurse and doctor who treat you today read your answers? Without this we cannot pass anything to the doctor, so this permission is required to continue here.",
+      "detail": "Only the nurse and doctor involved in your care today, in this department, can see your answers. Every time someone opens your record, it is recorded.",
+      "required": true
+    },
+    "abdm_sharing_intent": {
+      "title": "Sharing with the national health network later",
+      "short": "Only if you later want your record linked to your ABHA account",
+      "spoken": "Last: would you like your record to be shareable through the national health network later? This is entirely optional. If you say yes, a separate permission will still be asked through the Government's own consent service at that time — not here.",
+      "detail": "This only records your interest. Actual sharing needs a separate permission through the Government's own consent manager, granted at that time.",
+      "required": false
+    }
+  },
+
+  "rights": {
+    "title": "Your rights",
+    "spoken": "You have the right to say no to any of these, to ask what we hold about you, and to withdraw your permission at any time by telling any staff member.",
+    "withdraw": "You can withdraw any permission at any time.",
+    "access": "You can ask to see what information is held about you.",
+    "no_aadhaar": "We never ask for, receive, or store your Aadhaar number.",
+    "complaint": "If you have a concern, ask for the hospital's data protection officer."
+  },
+
+  "retention": {
+    "title": "How long we keep it",
+    "spoken": "Your medical record and your papers are kept as part of the hospital's medical records. Voice recordings are deleted immediately. Anything still being filled in on this screen is wiped the moment you finish.",
+    "audio": "Voice recordings: deleted immediately after being converted to text.",
+    "screen_state": "Whatever is on this screen: wiped completely when you finish.",
+    "record": "Your medical record and papers: kept as hospital medical records."
+  },
+
+  "revocation": {
+    "title": "Withdraw a permission",
+    "spoken": "You can withdraw a permission now. Choose the one you want to withdraw.",
+    "confirm": "Withdraw this permission?",
+    "confirmed": "Your permission has been withdrawn.",
+    "note_already_used": "Anything already recorded stays in your medical record, as the law requires, but we will stop using it for the purpose you withdrew."
+  }
+}

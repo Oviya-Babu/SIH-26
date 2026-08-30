@@ -1,0 +1,204 @@
+{
+  "$comment": [
+    "reason_code -> patient-appropriate message.",
+    "",
+    "The API returns a stable reason_code and never a message a patient reads",
+    "directly (§28). This bundle is the only place a reason_code becomes words, so",
+    "a patient never sees a technical string, and every failure has a defined",
+    "next action rather than a dead end (§37).",
+    "",
+    "Each entry has: title, body, action (what the button says), and staff (whether",
+    "a staff member should be called)."
+  ],
+
+  "generic": {
+    "title": "Something went wrong",
+    "body": "Nothing you have told us is lost. Please try once more.",
+    "action": "Try again",
+    "staff": false
+  },
+
+  "authentication_required": {
+    "title": "This session has ended",
+    "body": "For your privacy, this screen was cleared. Please start again from the beginning.",
+    "action": "Start again",
+    "staff": false
+  },
+  "forbidden": {
+    "title": "This is not available here",
+    "body": "Please ask a staff member for help.",
+    "action": "Call a staff member",
+    "staff": true
+  },
+  "not_found": {
+    "title": "We could not find that",
+    "body": "Please ask a staff member for help.",
+    "action": "Call a staff member",
+    "staff": true
+  },
+  "conflict": {
+    "title": "That has already been done",
+    "body": "You can carry on from here.",
+    "action": "Continue",
+    "staff": false
+  },
+  "validation_failed": {
+    "title": "Please check your answer",
+    "body": "That answer does not look complete. Please try again.",
+    "action": "Try again",
+    "staff": false
+  },
+  "consent_required": {
+    "title": "We need your permission first",
+    "body": "We cannot continue without your permission. A staff member can take your details in person instead.",
+    "action": "Go back to permissions",
+    "staff": false
+  },
+  "session_sealed_after_export": {
+    "title": "The doctor has already finalised this",
+    "body": "Your record has been sent to the doctor and can no longer be changed here. Please tell the doctor directly.",
+    "action": "Finish",
+    "staff": false
+  },
+  "dependency_unavailable": {
+    "title": "One part of the system is slow",
+    "body": "You can carry on. Nothing you have told us is lost.",
+    "action": "Continue",
+    "staff": false
+  },
+  "rate_limited": {
+    "title": "Please wait a moment",
+    "body": "That was a little too fast. Please wait a few seconds and try again.",
+    "action": "Try again",
+    "staff": false
+  },
+  "payload_too_large": {
+    "title": "That file is too large",
+    "body": "Please take the photograph again, or ask a staff member to help.",
+    "action": "Take it again",
+    "staff": false
+  },
+  "unsupported_media_type": {
+    "title": "We cannot read that kind of file",
+    "body": "Please take a photograph of the paper instead.",
+    "action": "Take a photograph",
+    "staff": false
+  },
+
+  "device_not_provisioned": {
+    "title": "This screen is not set up",
+    "body": "Please tell a staff member that this kiosk needs to be set up.",
+    "action": "Call a staff member",
+    "staff": true
+  },
+  "token_expired": {
+    "title": "The time has run out",
+    "body": "For your safety, the code has expired. Please start that step again.",
+    "action": "Start again",
+    "staff": false
+  },
+  "invalid_signature": {
+    "title": "This link is not valid",
+    "body": "Please scan the code shown on the kiosk screen again.",
+    "action": "Scan again",
+    "staff": false
+  },
+  "wrong_token_kind": {
+    "title": "This link is not valid",
+    "body": "Please scan the code shown on the kiosk screen again.",
+    "action": "Scan again",
+    "staff": false
+  },
+  "upload_session_closed": {
+    "title": "This has already finished",
+    "body": "Your visit details have already been sent to the doctor. Please show your papers to the doctor directly.",
+    "action": "Finish",
+    "staff": false
+  },
+  "malware_detected": {
+    "title": "We could not accept that file",
+    "body": "Please take a photograph of the paper with the camera instead.",
+    "action": "Take a photograph",
+    "staff": true
+  },
+  "image_unreadable": {
+    "title": "The photograph is not clear",
+    "body": "Hold the paper flat, keep it in the light, and take the photograph again.",
+    "action": "Take it again",
+    "staff": false
+  },
+
+  "asr_unavailable": {
+    "title": "Voice is not working right now",
+    "body": "Please answer by touching the screen. Everything you have said so far is saved.",
+    "action": "Answer by touch",
+    "staff": false
+  },
+  "asr_low_confidence": {
+    "title": "I did not catch that clearly",
+    "body": "It is noisy here. Please say it again, or answer by touching the screen.",
+    "action": "Try again",
+    "staff": false
+  },
+  "unknown_option": {
+    "title": "Please choose from the options shown",
+    "body": "Touch one of the choices on the screen.",
+    "action": "Choose again",
+    "staff": false
+  },
+  "exclusive_option_conflict": {
+    "title": "That cannot be combined",
+    "body": "You chose 'none of these' along with other answers. Please choose one or the other.",
+    "action": "Choose again",
+    "staff": false
+  },
+  "out_of_range": {
+    "title": "Please check that number",
+    "body": "That number seems too high or too low. Please enter it again.",
+    "action": "Enter again",
+    "staff": false
+  },
+  "value_required": {
+    "title": "Please answer this one",
+    "body": "This question needs an answer. If you do not know, touch 'I do not know'.",
+    "action": "Answer",
+    "staff": false
+  },
+  "expected_number": {
+    "title": "Please enter a number",
+    "body": "Use the number buttons on the screen.",
+    "action": "Enter again",
+    "staff": false
+  },
+  "expected_date": {
+    "title": "Please choose a date",
+    "body": "Use the date picker on the screen.",
+    "action": "Choose a date",
+    "staff": false
+  },
+  "too_long": {
+    "title": "That is a little too long",
+    "body": "Please shorten it, or tell the doctor directly instead.",
+    "action": "Shorten it",
+    "staff": false
+  },
+
+  "caregiver_ack_required": {
+    "title": "We must ask the patient first",
+    "body": "Before you answer for the patient, the patient must tell us it is all right.",
+    "action": "Ask the patient",
+    "staff": false
+  },
+  "caregiver_cannot_grant_consent": {
+    "title": "A staff member must record this",
+    "body": "Permission on someone else's behalf needs a document and a staff member. Please go to the counter.",
+    "action": "Call a staff member",
+    "staff": true
+  },
+  "offline_queued": {
+    "title": "Saved on this screen",
+    "body": "The internet is not working. Your answer is saved here and will be sent automatically.",
+    "action": "Continue",
+    "staff": false
+  }
+}

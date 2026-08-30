@@ -1,0 +1,497 @@
+{
+  "$comment": [
+    "Clinical-safety golden corpus (CLAUDE.md §52).",
+    "",
+    "A FIXED set of scenarios that must fire / not fire IDENTICALLY across",
+    "versions. This suite is a DEPLOYMENT GATE [RED LINE §52]: a PR that breaks it",
+    "does not merge, regardless of who authored it or what else it fixes.",
+    "",
+    "Authored by the Clinical Governance Board. Adding or changing a scenario",
+    "requires the clinical-safety-reviewer agent (§59).",
+    "",
+    "Each scenario declares:",
+    "  answers           — the normalized answer view the engine sees",
+    "  must_fire         — rule ids that MUST fire (a miss is a false negative)",
+    "  must_not_fire     — rule ids that MUST NOT fire (a hit is a false positive)",
+    "  expect_fast_path  — whether the AMPLE fast path must engage (§14)",
+    "  expect_alert      — whether a nurse-facing alert must be created",
+    "",
+    "Edge cases are deliberately included: incomplete history, conflicting",
+    "answers, and borderline severity — the three shapes most likely to break a",
+    "rule silently."
+  ],
+  "protocol": { "family": "general_medicine", "version": "v1" },
+  "ruleset": "emergency_v1",
+
+  "scenarios": [
+    {
+      "id": "gold.acs.textbook",
+      "description": "Classic ACS: crushing central chest pain radiating to the left arm, with cold sweating.",
+      "answers": {
+        "gm.cc.primary_complaint": { "code": "chest_pain" },
+        "gm.hpi.site": { "codes": ["chest_center"] },
+        "gm.hpi.character": { "codes": ["crushing"] },
+        "gm.hpi.radiation": { "codes": ["left_arm"] },
+        "gm.hpi.associated_symptoms": { "codes": ["cold_sweating", "breathlessness"] },
+        "gm.hpi.severity": { "value": 9 },
+        "gm.hpi.time_course": { "code": "sudden_and_severe" },
+        "gm.hpi.exacerbating": { "codes": ["physical_exertion"] }
+      },
+      "must_fire": [
+        "rf.acs.crushing_central_chest_pain",
+        "rf.acs.chest_pain_with_radiation",
+        "rf.acs.chest_pain_autonomic_features",
+        "rf.pain.severe_uncontrolled",
+        "rf.pain.sudden_severe_onset",
+        "rf.cardiac.exertional_pattern"
+      ],
+      "must_not_fire": [
+        "rf.stroke.fast_positive",
+        "rf.gi.upper_or_lower_gi_bleed",
+        "rf.aortic.tearing_pain"
+      ],
+      "expect_fast_path": true,
+      "expect_alert": true
+    },
+    {
+      "id": "gold.acs.left_sided_pressing",
+      "description": "Left-sided pressing chest pain without radiation — still ACS pattern by site and character.",
+      "answers": {
+        "gm.cc.primary_complaint": { "code": "chest_pain" },
+        "gm.hpi.site": { "codes": ["chest_left"] },
+        "gm.hpi.character": { "codes": ["pressing"] },
+        "gm.hpi.radiation": { "codes": ["does_not_spread"] },
+        "gm.hpi.associated_symptoms": { "codes": ["no_other_symptoms"] },
+        "gm.hpi.severity": { "value": 6 }
+      },
+      "must_fire": ["rf.acs.crushing_central_chest_pain"],
+      "must_not_fire": [
+        "rf.acs.chest_pain_with_radiation",
+        "rf.acs.chest_pain_autonomic_features",
+        "rf.pain.severe_uncontrolled"
+      ],
+      "expect_fast_path": true,
+      "expect_alert": true
+    },
+    {
+      "id": "gold.chest_pain.musculoskeletal_benign",
+      "description": "EDGE CASE — chest pain that is NOT an ACS pattern. Sharp, right-sided, worse on movement, mild. Must not trigger a cardiac alert.",
+      "answers": {
+        "gm.cc.primary_complaint": { "code": "chest_pain" },
+        "gm.hpi.site": { "codes": ["chest_right"] },
+        "gm.hpi.character": { "codes": ["sharp"] },
+        "gm.hpi.radiation": { "codes": ["does_not_spread"] },
+        "gm.hpi.associated_symptoms": { "codes": ["no_other_symptoms"] },
+        "gm.hpi.time_course": { "code": "comes_and_goes" },
+        "gm.hpi.exacerbating": { "codes": ["movement"] },
+        "gm.hpi.severity": { "value": 3 }
+      },
+      "must_fire": [],
+      "must_not_fire": [
+        "rf.acs.crushing_central_chest_pain",
+        "rf.acs.chest_pain_with_radiation",
+        "rf.acs.chest_pain_autonomic_features",
+        "rf.cardiac.exertional_pattern",
+        "rf.pain.severe_uncontrolled",
+        "rf.pain.sudden_severe_onset",
+        "rf.aortic.tearing_pain"
+      ],
+      "expect_fast_path": false,
+      "expect_alert": false
+    },
+    {
+      "id": "gold.aortic.tearing_back",
+      "description": "Tearing pain radiating to the back — aortic dissection pattern. Must fire even though the site is not the chest.",
+      "answers": {
+        "gm.cc.primary_complaint": { "code": "abdominal_pain" },
+        "gm.hpi.site": { "codes": ["upper_abdomen"] },
+        "gm.hpi.character": { "codes": ["tearing"] },
+        "gm.hpi.radiation": { "codes": ["back"] },
+        "gm.hpi.severity": { "value": 10 },
+        "gm.hpi.time_course": { "code": "sudden_and_severe" }
+      },
+      "must_fire": [
+        "rf.aortic.tearing_pain",
+        "rf.pain.severe_uncontrolled",
+        "rf.pain.sudden_severe_onset"
+      ],
+      "must_not_fire": ["rf.acs.crushing_central_chest_pain"],
+      "expect_fast_path": true,
+      "expect_alert": true
+    },
+    {
+      "id": "gold.stroke.hemiparesis",
+      "description": "Sudden one-sided weakness with speech difficulty — time-critical stroke pathway.",
+      "answers": {
+        "gm.cc.primary_complaint": { "code": "weakness_fatigue" },
+        "gm.hpi.associated_symptoms": { "codes": ["weakness_one_side", "speech_difficulty"] },
+        "gm.hpi.time_course": { "code": "sudden_and_severe" },
+        "gm.hpi.severity": { "value": 7 },
+        "gm.ros.neurological": { "codes": ["sudden_confusion"] }
+      },
+      "must_fire": ["rf.stroke.fast_positive", "rf.pain.sudden_severe_onset"],
+      "must_not_fire": ["rf.acs.crushing_central_chest_pain", "rf.pain.severe_uncontrolled"],
+      "expect_fast_path": true,
+      "expect_alert": true
+    },
+    {
+      "id": "gold.neuro.thunderclap",
+      "description": "Worst-ever headache with neck stiffness — subarachnoid haemorrhage / meningitis.",
+      "answers": {
+        "gm.cc.primary_complaint": { "code": "headache" },
+        "gm.hpi.site": { "codes": ["head"] },
+        "gm.hpi.character": { "codes": ["throbbing"] },
+        "gm.hpi.severity": { "value": 10 },
+        "gm.ros.neurological": { "codes": ["worst_headache_ever", "neck_stiffness"] }
+      },
+      "must_fire": [
+        "rf.neuro.thunderclap_headache",
+        "rf.pain.severe_uncontrolled"
+      ],
+      "must_not_fire": ["rf.stroke.fast_positive", "rf.neuro.seizure_or_loc"],
+      "expect_fast_path": true,
+      "expect_alert": true
+    },
+    {
+      "id": "gold.neuro.seizure",
+      "description": "Reported seizure — must not be left waiting in a queue.",
+      "answers": {
+        "gm.cc.primary_complaint": { "code": "dizziness" },
+        "gm.ros.neurological": { "codes": ["fits_or_seizures", "loss_of_consciousness"] },
+        "gm.hpi.severity": { "value": 5 }
+      },
+      "must_fire": ["rf.neuro.seizure_or_loc"],
+      "must_not_fire": ["rf.neuro.thunderclap_headache", "rf.pain.severe_uncontrolled"],
+      "expect_fast_path": true,
+      "expect_alert": true
+    },
+    {
+      "id": "gold.resp.severe_dyspnoea",
+      "description": "Breathlessness at severity 8 — exactly at the boundary. BORDERLINE by design.",
+      "answers": {
+        "gm.cc.primary_complaint": { "code": "breathlessness" },
+        "gm.hpi.severity": { "value": 8 },
+        "gm.hpi.associated_symptoms": { "codes": ["no_other_symptoms"] }
+      },
+      "must_fire": ["rf.resp.severe_dyspnoea", "rf.pain.severe_uncontrolled"],
+      "must_not_fire": ["rf.resp.orthopnoea"],
+      "expect_fast_path": true,
+      "expect_alert": true
+    },
+    {
+      "id": "gold.resp.dyspnoea_just_below_threshold",
+      "description": "BORDERLINE — breathlessness at severity 7 must NOT fire the severe-dyspnoea or severe-pain rules. Guards against an off-by-one in the comparison.",
+      "answers": {
+        "gm.cc.primary_complaint": { "code": "breathlessness" },
+        "gm.hpi.severity": { "value": 7 },
+        "gm.hpi.associated_symptoms": { "codes": ["no_other_symptoms"] }
+      },
+      "must_fire": [],
+      "must_not_fire": ["rf.resp.severe_dyspnoea", "rf.pain.severe_uncontrolled"],
+      "expect_fast_path": false,
+      "expect_alert": false
+    },
+    {
+      "id": "gold.resp.orthopnoea_heart_failure",
+      "description": "Breathless lying flat — decompensated heart failure. High, not critical: no fast path.",
+      "answers": {
+        "gm.cc.primary_complaint": { "code": "breathlessness" },
+        "gm.hpi.severity": { "value": 5 },
+        "gm.ros.cardiorespiratory": { "codes": ["breathless_lying_flat", "ankle_swelling"] }
+      },
+      "must_fire": ["rf.resp.orthopnoea"],
+      "must_not_fire": ["rf.resp.severe_dyspnoea"],
+      "expect_fast_path": false,
+      "expect_alert": true
+    },
+    {
+      "id": "gold.gi.melaena",
+      "description": "Black stool — active GI bleeding.",
+      "answers": {
+        "gm.cc.primary_complaint": { "code": "abdominal_pain" },
+        "gm.hpi.severity": { "value": 6 },
+        "gm.ros.gastrointestinal": { "codes": ["black_or_bloody_stool"] }
+      },
+      "must_fire": ["rf.gi.upper_or_lower_gi_bleed"],
+      "must_not_fire": ["rf.resp.haemoptysis"],
+      "expect_fast_path": true,
+      "expect_alert": true
+    },
+    {
+      "id": "gold.allergy.prior_anaphylaxis",
+      "description": "Documented penicillin allergy with airway swelling — prior anaphylaxis. Also co-exists with active medication.",
+      "answers": {
+        "gm.cc.primary_complaint": { "code": "fever" },
+        "gm.allergy.has_allergy": { "code": "yes" },
+        "gm.allergy.substances": { "codes": ["penicillin"] },
+        "gm.allergy.reaction": { "codes": ["swelling_of_face_or_lips", "difficulty_breathing"] },
+        "gm.med.taking_medicines": { "code": "yes_regularly" },
+        "gm.hpi.severity": { "value": 4 }
+      },
+      "must_fire": [
+        "rf.anaphylaxis.airway_or_collapse",
+        "rf.medication.allergy_with_active_medication"
+      ],
+      "must_not_fire": ["rf.resp.severe_dyspnoea"],
+      "expect_fast_path": true,
+      "expect_alert": true
+    },
+    {
+      "id": "gold.allergy.mild_rash_only",
+      "description": "EDGE CASE — allergy history of rash only. Must NOT fire the anaphylaxis rule.",
+      "answers": {
+        "gm.cc.primary_complaint": { "code": "skin_problem" },
+        "gm.allergy.has_allergy": { "code": "yes" },
+        "gm.allergy.substances": { "codes": ["dust_or_pollen"] },
+        "gm.allergy.reaction": { "codes": ["rash_or_itching"] },
+        "gm.med.taking_medicines": { "code": "no" },
+        "gm.hpi.severity": { "value": 2 }
+      },
+      "must_fire": [],
+      "must_not_fire": [
+        "rf.anaphylaxis.airway_or_collapse",
+        "rf.medication.allergy_with_active_medication"
+      ],
+      "expect_fast_path": false,
+      "expect_alert": false
+    },
+    {
+      "id": "gold.medication.self_discontinued",
+      "description": "Patient stopped chronic therapy on their own — moderate severity: logged and surfaced to the physician, no nurse page.",
+      "answers": {
+        "gm.cc.primary_complaint": { "code": "headache" },
+        "gm.hpi.severity": { "value": 4 },
+        "gm.med.taking_medicines": { "code": "yes_sometimes" },
+        "gm.med.adherence": { "code": "stopped_on_my_own" },
+        "gm.allergy.has_allergy": { "code": "no" }
+      },
+      "must_fire": ["rf.medication.self_discontinued"],
+      "must_not_fire": ["rf.medication.allergy_with_active_medication"],
+      "expect_fast_path": false,
+      "expect_alert": false
+    },
+    {
+      "id": "gold.constitutional.tb_pattern",
+      "description": "Weight loss with night sweats and persistent fever — TB / malignancy screen.",
+      "answers": {
+        "gm.cc.primary_complaint": { "code": "cough" },
+        "gm.hpi.severity": { "value": 4 },
+        "gm.ros.constitutional": {
+          "codes": ["weight_loss", "night_sweats", "persistent_fever"]
+        }
+      },
+      "must_fire": ["rf.constitutional.weight_loss_red_flag"],
+      "must_not_fire": ["rf.resp.haemoptysis"],
+      "expect_fast_path": false,
+      "expect_alert": true
+    },
+    {
+      "id": "gold.constitutional.weight_loss_alone",
+      "description": "EDGE CASE — weight loss WITHOUT night sweats or persistent fever must not fire. The rule requires the combination.",
+      "answers": {
+        "gm.cc.primary_complaint": { "code": "weakness_fatigue" },
+        "gm.hpi.severity": { "value": 3 },
+        "gm.ros.constitutional": { "codes": ["weight_loss", "loss_of_appetite"] }
+      },
+      "must_fire": [],
+      "must_not_fire": ["rf.constitutional.weight_loss_red_flag"],
+      "expect_fast_path": false,
+      "expect_alert": false
+    },
+    {
+      "id": "gold.renal.oliguria",
+      "description": "Reduced urine output — acute kidney injury screen.",
+      "answers": {
+        "gm.cc.primary_complaint": { "code": "swelling" },
+        "gm.hpi.severity": { "value": 5 },
+        "gm.ros.genitourinary": { "codes": ["reduced_urine"] }
+      },
+      "must_fire": ["rf.renal.anuria_or_haematuria"],
+      "must_not_fire": [],
+      "expect_fast_path": false,
+      "expect_alert": true
+    },
+    {
+      "id": "gold.incomplete.only_complaint_answered",
+      "description": "EDGE CASE — INCOMPLETE HISTORY. Only the chief complaint is answered. No rule may fire on absence of data, and the interview must not escalate.",
+      "answers": {
+        "gm.cc.primary_complaint": { "code": "chest_pain" }
+      },
+      "must_fire": [],
+      "must_not_fire": [
+        "rf.acs.crushing_central_chest_pain",
+        "rf.acs.chest_pain_with_radiation",
+        "rf.acs.chest_pain_autonomic_features",
+        "rf.pain.severe_uncontrolled",
+        "rf.stroke.fast_positive",
+        "rf.medication.allergy_with_active_medication"
+      ],
+      "expect_fast_path": false,
+      "expect_alert": false
+    },
+    {
+      "id": "gold.incomplete.nothing_answered",
+      "description": "EDGE CASE — empty session. Absolutely nothing may fire.",
+      "answers": {},
+      "must_fire": [],
+      "must_not_fire": ["*"],
+      "expect_fast_path": false,
+      "expect_alert": false
+    },
+    {
+      "id": "gold.conflicting.severity_and_reassurance",
+      "description": "EDGE CASE — CONFLICTING ANSWERS. The patient reports severity 10 while also selecting 'getting better' and 'nothing helps'. The severe-pain rule must still fire: a conflict is surfaced, never used to suppress a safety rule (§15).",
+      "answers": {
+        "gm.cc.primary_complaint": { "code": "joint_or_back_pain" },
+        "gm.hpi.severity": { "value": 10 },
+        "gm.hpi.time_course": { "code": "getting_better" },
+        "gm.hpi.relieving": { "codes": ["nothing_helps"] }
+      },
+      "must_fire": ["rf.pain.severe_uncontrolled"],
+      "must_not_fire": ["rf.pain.sudden_severe_onset"],
+      "expect_fast_path": false,
+      "expect_alert": true
+    },
+    {
+      "id": "gold.conflicting.denies_symptoms_but_selects_one",
+      "description": "EDGE CASE — the patient's ROS answer contains a critical finding even though the chief complaint is unrelated. The rule must fire on the finding, not on the complaint.",
+      "answers": {
+        "gm.cc.primary_complaint": { "code": "burning_urination" },
+        "gm.hpi.severity": { "value": 3 },
+        "gm.ros.gastrointestinal": { "codes": ["vomiting_blood"] },
+        "gm.ros.genitourinary": { "codes": ["burning_urination"] }
+      },
+      "must_fire": ["rf.gi.upper_or_lower_gi_bleed"],
+      "must_not_fire": ["rf.renal.anuria_or_haematuria"],
+      "expect_fast_path": true,
+      "expect_alert": true
+    },
+    {
+      "id": "gold.exertional.angina_pattern",
+      "description": "Exertional chest pain without the crushing descriptor — high, not critical.",
+      "answers": {
+        "gm.cc.primary_complaint": { "code": "chest_pain" },
+        "gm.hpi.site": { "codes": ["chest_center"] },
+        "gm.hpi.character": { "codes": ["dull_ache"] },
+        "gm.hpi.radiation": { "codes": ["does_not_spread"] },
+        "gm.hpi.associated_symptoms": { "codes": ["no_other_symptoms"] },
+        "gm.hpi.exacerbating": { "codes": ["physical_exertion"] },
+        "gm.hpi.relieving": { "codes": ["rest"] },
+        "gm.hpi.severity": { "value": 5 }
+      },
+      "must_fire": ["rf.cardiac.exertional_pattern"],
+      "must_not_fire": [
+        "rf.acs.crushing_central_chest_pain",
+        "rf.acs.chest_pain_autonomic_features"
+      ],
+      "expect_fast_path": false,
+      "expect_alert": true
+    },
+    {
+      "id": "gold.benign.simple_fever",
+      "description": "A completely benign presentation. Nothing may fire — this is the false-positive canary for the whole ruleset.",
+      "answers": {
+        "gm.cc.primary_complaint": { "code": "fever" },
+        "gm.cc.duration_of_concern": { "value": 2, "unit": "days" },
+        "gm.hpi.severity": { "value": 3 },
+        "gm.hpi.associated_symptoms": { "codes": ["no_other_symptoms"] },
+        "gm.hpi.time_course": { "code": "comes_and_goes" },
+        "gm.hpi.exacerbating": { "codes": ["nothing_in_particular"] },
+        "gm.hpi.relieving": { "codes": ["medicine"] },
+        "gm.ros.constitutional": { "codes": ["none_of_these"] },
+        "gm.ros.cardiorespiratory": { "codes": ["none_of_these"] },
+        "gm.ros.gastrointestinal": { "codes": ["none_of_these"] },
+        "gm.ros.genitourinary": { "codes": ["none_of_these"] },
+        "gm.ros.neurological": { "codes": ["none_of_these"] },
+        "gm.ros.musculoskeletal": { "codes": ["none_of_these"] },
+        "gm.pmh.conditions": { "codes": ["none_known"] },
+        "gm.med.taking_medicines": { "code": "no" },
+        "gm.allergy.has_allergy": { "code": "no" }
+      },
+      "must_fire": [],
+      "must_not_fire": ["*"],
+      "expect_fast_path": false,
+      "expect_alert": false
+    },
+    {
+      "id": "gold.ayush.severe_debility",
+      "description": "AYUSH intake with no appetite at all and very weak strength — must be caught even in an AYUSH department.",
+      "protocol": { "family": "ayush_ayurveda", "version": "v1" },
+      "answers": {
+        "gm.cc.primary_complaint": { "code": "weakness_fatigue" },
+        "gm.hpi.severity": { "value": 5 },
+        "ay.dv.sara.stamina": { "code": "very_weak" },
+        "ay.dv.ahara_shakti.capacity": { "code": "no_appetite_at_all" },
+        "ay.dv.vyayama_shakti.capacity": { "code": "moderate_exertion_only" }
+      },
+      "must_fire": ["rf.ayush.severe_debility"],
+      "must_not_fire": ["rf.ayush.exertional_intolerance"],
+      "expect_fast_path": false,
+      "expect_alert": true
+    },
+    {
+      "id": "gold.ayush.exertional_intolerance",
+      "description": "AYUSH intake reporting breathlessness on mild exertion — a cardiorespiratory finding that must escalate regardless of department.",
+      "protocol": { "family": "ayush_ayurveda", "version": "v1" },
+      "answers": {
+        "gm.cc.primary_complaint": { "code": "breathlessness" },
+        "gm.hpi.severity": { "value": 6 },
+        "ay.dv.vyayama_shakti.capacity": { "code": "breathless_on_mild_exertion" },
+        "ay.dv.sara.stamina": { "code": "tires_easily" },
+        "ay.dv.ahara_shakti.capacity": { "code": "poor_appetite" }
+      },
+      "must_fire": ["rf.ayush.exertional_intolerance"],
+      "must_not_fire": ["rf.ayush.severe_debility", "rf.resp.severe_dyspnoea"],
+      "expect_fast_path": false,
+      "expect_alert": true
+    },
+    {
+      "id": "gold.ayush.inherited_rule_still_armed",
+      "description": "An AYUSH session with a classic ACS pattern must fire the inherited General Medicine cardiac rules — proof that composition does not disarm safety.",
+      "protocol": { "family": "ayush_ayurveda", "version": "v1" },
+      "answers": {
+        "gm.cc.primary_complaint": { "code": "chest_pain" },
+        "gm.hpi.site": { "codes": ["chest_center"] },
+        "gm.hpi.character": { "codes": ["crushing"] },
+        "gm.hpi.radiation": { "codes": ["jaw"] },
+        "gm.hpi.severity": { "value": 9 }
+      },
+      "must_fire": [
+        "rf.acs.crushing_central_chest_pain",
+        "rf.acs.chest_pain_with_radiation",
+        "rf.pain.severe_uncontrolled"
+      ],
+      "must_not_fire": ["rf.ayush.severe_debility"],
+      "expect_fast_path": true,
+      "expect_alert": true
+    },
+    {
+      "id": "gold.injury.trauma",
+      "description": "Injury with sudden severe onset after a fall.",
+      "answers": {
+        "gm.cc.primary_complaint": { "code": "injury" },
+        "gm.hpi.site": { "codes": ["left_leg"] },
+        "gm.hpi.character": { "codes": ["sharp"] },
+        "gm.hpi.severity": { "value": 9 },
+        "gm.hpi.time_course": { "code": "sudden_and_severe" }
+      },
+      "must_fire": ["rf.pain.severe_uncontrolled", "rf.pain.sudden_severe_onset"],
+      "must_not_fire": ["rf.acs.crushing_central_chest_pain", "rf.aortic.tearing_pain"],
+      "expect_fast_path": false,
+      "expect_alert": true
+    },
+    {
+      "id": "gold.resp.haemoptysis",
+      "description": "Blood in cough — TB / malignancy / PE evaluation with infection precautions.",
+      "answers": {
+        "gm.cc.primary_complaint": { "code": "cough" },
+        "gm.hpi.severity": { "value": 4 },
+        "gm.hpi.associated_symptoms": { "codes": ["coughing_blood", "fever"] }
+      },
+      "must_fire": ["rf.resp.haemoptysis"],
+      "must_not_fire": ["rf.gi.upper_or_lower_gi_bleed", "rf.resp.severe_dyspnoea"],
+      "expect_fast_path": false,
+      "expect_alert": true
+    }
+  ]
+}

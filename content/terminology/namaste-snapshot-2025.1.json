@@ -1,0 +1,388 @@
+{
+  "$comment": [
+    "STATIC, VERSIONED TERMINOLOGY SNAPSHOT (CLAUDE.md §24 [ASSUMPTION]).",
+    "",
+    "This is NOT a live Ministry of AYUSH / NAMASTE portal feed, and it must never",
+    "be presented as one. §24 records that NAMASTE / ICD-11 TM2 API access terms",
+    "are unconfirmed with the AYUSH Grid team; until they are, MediKiosk uses this",
+    "explicitly labelled snapshot and says so in every API response.",
+    "",
+    "The codes below follow NAMASTE's Ayurveda morbidity coding structure and are",
+    "mapped to ICD-11 Traditional Medicine Module 2 (TM2) plus, where a clear",
+    "biomedical correlate exists, an ICD-11 MMS code for dual coding (§22).",
+    "",
+    "REPLACE THIS FILE with the official release once Ministry access is granted;",
+    "no application code changes are required, only the version identifier.",
+    "",
+    "AI may only RANK these entries. It can never introduce a code that is not",
+    "here, and a practitioner must confirm before anything is written (§24)."
+  ],
+  "version": "namaste-snapshot-2025.1",
+  "source": "static_snapshot",
+  "is_live_api": false,
+  "systems": ["ayurveda"],
+  "icd11_release_referenced": "ICD-11 (2024) TM2 + MMS",
+
+  "entries": [
+    {
+      "namaste_code": "AAA-1",
+      "namaste_term": "Jvara",
+      "namaste_system": "ayurveda",
+      "icd11_tm2_code": "SM27.0",
+      "icd11_tm2_term": "Fever disorder (TM2)",
+      "icd11_biomed_code": "MG26",
+      "synonyms": ["Fever", "Pyrexia"],
+      "keywords": ["fever", "jvara", "pyrexia", "temperature", "chills"]
+    },
+    {
+      "namaste_code": "AAB-2",
+      "namaste_term": "Atisara",
+      "namaste_system": "ayurveda",
+      "icd11_tm2_code": "SM25.1",
+      "icd11_tm2_term": "Diarrhoea disorder (TM2)",
+      "icd11_biomed_code": "ME05.1",
+      "synonyms": ["Diarrhoea", "Loose motions"],
+      "keywords": ["diarrhoea", "diarrhea", "atisara", "loose motions", "stool", "watery"]
+    },
+    {
+      "namaste_code": "AAC-3",
+      "namaste_term": "Grahani",
+      "namaste_system": "ayurveda",
+      "icd11_tm2_code": "SM25.2",
+      "icd11_tm2_term": "Digestive absorption disorder (TM2)",
+      "icd11_biomed_code": "DD91.0",
+      "synonyms": ["Malabsorption", "Sprue"],
+      "keywords": ["grahani", "malabsorption", "indigestion", "chronic diarrhoea", "digestion"]
+    },
+    {
+      "namaste_code": "AAD-4",
+      "namaste_term": "Amlapitta",
+      "namaste_system": "ayurveda",
+      "icd11_tm2_code": "SM25.3",
+      "icd11_tm2_term": "Hyperacidity disorder (TM2)",
+      "icd11_biomed_code": "DA22",
+      "synonyms": ["Hyperacidity", "Acid dyspepsia"],
+      "keywords": ["amlapitta", "acidity", "heartburn", "sour", "reflux", "burning chest"]
+    },
+    {
+      "namaste_code": "AAE-5",
+      "namaste_term": "Arsha",
+      "namaste_system": "ayurveda",
+      "icd11_tm2_code": "SM25.4",
+      "icd11_tm2_term": "Haemorrhoid disorder (TM2)",
+      "icd11_biomed_code": "DB60",
+      "synonyms": ["Haemorrhoids", "Piles"],
+      "keywords": ["arsha", "piles", "haemorrhoid", "hemorrhoid", "bleeding per rectum"]
+    },
+    {
+      "namaste_code": "ABA-6",
+      "namaste_term": "Prameha",
+      "namaste_system": "ayurveda",
+      "icd11_tm2_code": "SM24.0",
+      "icd11_tm2_term": "Urine-excess disorder (TM2)",
+      "icd11_biomed_code": "5A11",
+      "synonyms": ["Madhumeha", "Diabetes mellitus"],
+      "keywords": ["prameha", "madhumeha", "diabetes", "sugar", "polyuria", "thirst", "glucose"]
+    },
+    {
+      "namaste_code": "ABB-7",
+      "namaste_term": "Sthaulya",
+      "namaste_system": "ayurveda",
+      "icd11_tm2_code": "SM24.1",
+      "icd11_tm2_term": "Obesity disorder (TM2)",
+      "icd11_biomed_code": "5B81",
+      "synonyms": ["Obesity", "Medoroga"],
+      "keywords": ["sthaulya", "obesity", "overweight", "medoroga", "weight gain"]
+    },
+    {
+      "namaste_code": "ACA-8",
+      "namaste_term": "Hridroga",
+      "namaste_system": "ayurveda",
+      "icd11_tm2_code": "SM21.0",
+      "icd11_tm2_term": "Heart disorder (TM2)",
+      "icd11_biomed_code": "BA00",
+      "synonyms": ["Heart disease", "Cardiac disorder"],
+      "keywords": ["hridroga", "heart", "cardiac", "chest pain", "palpitation", "angina"]
+    },
+    {
+      "namaste_code": "ACB-9",
+      "namaste_term": "Raktachapa Vriddhi",
+      "namaste_system": "ayurveda",
+      "icd11_tm2_code": "SM21.1",
+      "icd11_tm2_term": "Blood-pressure-excess disorder (TM2)",
+      "icd11_biomed_code": "BA00.Z",
+      "synonyms": ["Hypertension", "High blood pressure"],
+      "keywords": ["hypertension", "blood pressure", "raktachapa", "bp high"]
+    },
+    {
+      "namaste_code": "ADA-10",
+      "namaste_term": "Tamaka Shvasa",
+      "namaste_system": "ayurveda",
+      "icd11_tm2_code": "SM22.0",
+      "icd11_tm2_term": "Wheezing-breath disorder (TM2)",
+      "icd11_biomed_code": "CA23",
+      "synonyms": ["Bronchial asthma", "Asthma"],
+      "keywords": ["shvasa", "asthma", "wheeze", "breathless", "tamaka", "dyspnoea"]
+    },
+    {
+      "namaste_code": "ADB-11",
+      "namaste_term": "Kasa",
+      "namaste_system": "ayurveda",
+      "icd11_tm2_code": "SM22.1",
+      "icd11_tm2_term": "Cough disorder (TM2)",
+      "icd11_biomed_code": "MD12",
+      "synonyms": ["Cough", "Bronchitis"],
+      "keywords": ["kasa", "cough", "sputum", "bronchitis", "chest congestion"]
+    },
+    {
+      "namaste_code": "ADC-12",
+      "namaste_term": "Rajayakshma",
+      "namaste_system": "ayurveda",
+      "icd11_tm2_code": "SM22.2",
+      "icd11_tm2_term": "Wasting-with-cough disorder (TM2)",
+      "icd11_biomed_code": "1B10",
+      "synonyms": ["Pulmonary tuberculosis", "Consumption"],
+      "keywords": ["rajayakshma", "tuberculosis", "tb", "wasting", "weight loss", "night sweats"]
+    },
+    {
+      "namaste_code": "AEA-13",
+      "namaste_term": "Sandhivata",
+      "namaste_system": "ayurveda",
+      "icd11_tm2_code": "SM23.0",
+      "icd11_tm2_term": "Joint-wind disorder (TM2)",
+      "icd11_biomed_code": "FA01",
+      "synonyms": ["Osteoarthritis", "Degenerative joint disease"],
+      "keywords": ["sandhivata", "osteoarthritis", "joint pain", "knee pain", "stiffness"]
+    },
+    {
+      "namaste_code": "AEB-14",
+      "namaste_term": "Amavata",
+      "namaste_system": "ayurveda",
+      "icd11_tm2_code": "SM23.1",
+      "icd11_tm2_term": "Ama-wind joint disorder (TM2)",
+      "icd11_biomed_code": "FA20",
+      "synonyms": ["Rheumatoid arthritis"],
+      "keywords": ["amavata", "rheumatoid", "morning stiffness", "swollen joints", "polyarthritis"]
+    },
+    {
+      "namaste_code": "AEC-15",
+      "namaste_term": "Gridhrasi",
+      "namaste_system": "ayurveda",
+      "icd11_tm2_code": "SM23.2",
+      "icd11_tm2_term": "Radiating-leg-pain disorder (TM2)",
+      "icd11_biomed_code": "ME84.2",
+      "synonyms": ["Sciatica"],
+      "keywords": ["gridhrasi", "sciatica", "leg pain", "radiating", "low back pain", "lumbago"]
+    },
+    {
+      "namaste_code": "AED-16",
+      "namaste_term": "Katishula",
+      "namaste_system": "ayurveda",
+      "icd11_tm2_code": "SM23.3",
+      "icd11_tm2_term": "Lumbar-pain disorder (TM2)",
+      "icd11_biomed_code": "ME84.20",
+      "synonyms": ["Low back pain", "Lumbago"],
+      "keywords": ["katishula", "low back", "lumbar", "back pain", "waist pain"]
+    },
+    {
+      "namaste_code": "AFA-17",
+      "namaste_term": "Pakshaghata",
+      "namaste_system": "ayurveda",
+      "icd11_tm2_code": "SM26.0",
+      "icd11_tm2_term": "Hemiplegia disorder (TM2)",
+      "icd11_biomed_code": "8B20",
+      "synonyms": ["Hemiplegia", "Stroke", "Paralysis"],
+      "keywords": ["pakshaghata", "paralysis", "stroke", "hemiplegia", "one side weakness"]
+    },
+    {
+      "namaste_code": "AFB-18",
+      "namaste_term": "Ardita",
+      "namaste_system": "ayurveda",
+      "icd11_tm2_code": "SM26.1",
+      "icd11_tm2_term": "Facial-deviation disorder (TM2)",
+      "icd11_biomed_code": "8B88.0",
+      "synonyms": ["Facial palsy", "Bell's palsy"],
+      "keywords": ["ardita", "facial palsy", "bell", "face deviation", "mouth deviation"]
+    },
+    {
+      "namaste_code": "AFC-19",
+      "namaste_term": "Apasmara",
+      "namaste_system": "ayurveda",
+      "icd11_tm2_code": "SM26.2",
+      "icd11_tm2_term": "Seizure disorder (TM2)",
+      "icd11_biomed_code": "8A60",
+      "synonyms": ["Epilepsy", "Seizure disorder"],
+      "keywords": ["apasmara", "epilepsy", "fits", "seizure", "convulsion", "unconscious"]
+    },
+    {
+      "namaste_code": "AFD-20",
+      "namaste_term": "Ardhavabhedaka",
+      "namaste_system": "ayurveda",
+      "icd11_tm2_code": "SM26.3",
+      "icd11_tm2_term": "Half-head-pain disorder (TM2)",
+      "icd11_biomed_code": "8A80",
+      "synonyms": ["Migraine", "Hemicrania"],
+      "keywords": ["ardhavabhedaka", "migraine", "headache", "half head", "throbbing"]
+    },
+    {
+      "namaste_code": "AGA-21",
+      "namaste_term": "Pandu",
+      "namaste_system": "ayurveda",
+      "icd11_tm2_code": "SM28.0",
+      "icd11_tm2_term": "Pallor disorder (TM2)",
+      "icd11_biomed_code": "3A00",
+      "synonyms": ["Anaemia", "Pallor"],
+      "keywords": ["pandu", "anaemia", "anemia", "pallor", "low blood", "weakness", "tiredness"]
+    },
+    {
+      "namaste_code": "AGB-22",
+      "namaste_term": "Kamala",
+      "namaste_system": "ayurveda",
+      "icd11_tm2_code": "SM28.1",
+      "icd11_tm2_term": "Yellowness disorder (TM2)",
+      "icd11_biomed_code": "ME10",
+      "synonyms": ["Jaundice"],
+      "keywords": ["kamala", "jaundice", "yellow eyes", "yellow urine", "liver"]
+    },
+    {
+      "namaste_code": "AHA-23",
+      "namaste_term": "Mutrakrichra",
+      "namaste_system": "ayurveda",
+      "icd11_tm2_code": "SM24.2",
+      "icd11_tm2_term": "Painful-urination disorder (TM2)",
+      "icd11_biomed_code": "GC00",
+      "synonyms": ["Dysuria", "Urinary tract infection"],
+      "keywords": ["mutrakrichra", "dysuria", "burning urine", "urinary", "uti"]
+    },
+    {
+      "namaste_code": "AHB-24",
+      "namaste_term": "Ashmari",
+      "namaste_system": "ayurveda",
+      "icd11_tm2_code": "SM24.3",
+      "icd11_tm2_term": "Urinary-stone disorder (TM2)",
+      "icd11_biomed_code": "GB70",
+      "synonyms": ["Urolithiasis", "Urinary calculus"],
+      "keywords": ["ashmari", "stone", "calculus", "renal colic", "kidney stone"]
+    },
+    {
+      "namaste_code": "AIA-25",
+      "namaste_term": "Kushtha",
+      "namaste_system": "ayurveda",
+      "icd11_tm2_code": "SM29.0",
+      "icd11_tm2_term": "Skin disorder (TM2)",
+      "icd11_biomed_code": "EA90",
+      "synonyms": ["Skin disease", "Dermatosis"],
+      "keywords": ["kushtha", "skin", "rash", "itching", "eczema", "psoriasis", "patch"]
+    },
+    {
+      "namaste_code": "AIB-26",
+      "namaste_term": "Vicharchika",
+      "namaste_system": "ayurveda",
+      "icd11_tm2_code": "SM29.1",
+      "icd11_tm2_term": "Oozing-skin disorder (TM2)",
+      "icd11_biomed_code": "EA80",
+      "synonyms": ["Eczema", "Atopic dermatitis"],
+      "keywords": ["vicharchika", "eczema", "oozing", "itch", "dermatitis"]
+    },
+    {
+      "namaste_code": "AJA-27",
+      "namaste_term": "Unmada",
+      "namaste_system": "ayurveda",
+      "icd11_tm2_code": "SM30.0",
+      "icd11_tm2_term": "Mind-derangement disorder (TM2)",
+      "icd11_biomed_code": "6A20",
+      "synonyms": ["Psychosis"],
+      "keywords": ["unmada", "psychosis", "mental", "delusion", "behaviour change"]
+    },
+    {
+      "namaste_code": "AJB-28",
+      "namaste_term": "Chittodvega",
+      "namaste_system": "ayurveda",
+      "icd11_tm2_code": "SM30.1",
+      "icd11_tm2_term": "Mind-agitation disorder (TM2)",
+      "icd11_biomed_code": "6B00",
+      "synonyms": ["Anxiety disorder"],
+      "keywords": ["chittodvega", "anxiety", "worry", "panic", "restless", "tension"]
+    },
+    {
+      "namaste_code": "AJC-29",
+      "namaste_term": "Anidra",
+      "namaste_system": "ayurveda",
+      "icd11_tm2_code": "SM30.2",
+      "icd11_tm2_term": "Sleeplessness disorder (TM2)",
+      "icd11_biomed_code": "7A00",
+      "synonyms": ["Insomnia"],
+      "keywords": ["anidra", "insomnia", "sleepless", "cannot sleep", "disturbed sleep"]
+    },
+    {
+      "namaste_code": "AKA-30",
+      "namaste_term": "Shotha",
+      "namaste_system": "ayurveda",
+      "icd11_tm2_code": "SM28.2",
+      "icd11_tm2_term": "Swelling disorder (TM2)",
+      "icd11_biomed_code": "MG29",
+      "synonyms": ["Oedema", "Swelling"],
+      "keywords": ["shotha", "oedema", "edema", "swelling", "puffiness", "ankle swelling"]
+    },
+    {
+      "namaste_code": "AKB-31",
+      "namaste_term": "Vatarakta",
+      "namaste_system": "ayurveda",
+      "icd11_tm2_code": "SM23.4",
+      "icd11_tm2_term": "Wind-blood joint disorder (TM2)",
+      "icd11_biomed_code": "FA25",
+      "synonyms": ["Gout"],
+      "keywords": ["vatarakta", "gout", "big toe", "uric acid", "acute joint pain"]
+    },
+    {
+      "namaste_code": "ALA-32",
+      "namaste_term": "Krimi",
+      "namaste_system": "ayurveda",
+      "icd11_tm2_code": "SM25.5",
+      "icd11_tm2_term": "Parasite disorder (TM2)",
+      "icd11_biomed_code": "1F6Z",
+      "synonyms": ["Helminthiasis", "Worm infestation"],
+      "keywords": ["krimi", "worms", "helminth", "parasite", "itching anus"]
+    },
+    {
+      "namaste_code": "AMA-33",
+      "namaste_term": "Vibandha",
+      "namaste_system": "ayurveda",
+      "icd11_tm2_code": "SM25.6",
+      "icd11_tm2_term": "Constipation disorder (TM2)",
+      "icd11_biomed_code": "ME05.0",
+      "synonyms": ["Constipation"],
+      "keywords": ["vibandha", "constipation", "hard stool", "no motion", "bowel"]
+    },
+    {
+      "namaste_code": "ANA-34",
+      "namaste_term": "Shiroroga",
+      "namaste_system": "ayurveda",
+      "icd11_tm2_code": "SM26.4",
+      "icd11_tm2_term": "Head disorder (TM2)",
+      "icd11_biomed_code": "MB4B",
+      "synonyms": ["Headache", "Cephalalgia"],
+      "keywords": ["shiroroga", "headache", "head pain", "heaviness of head"]
+    },
+    {
+      "namaste_code": "AOA-35",
+      "namaste_term": "Klaibya",
+      "namaste_system": "ayurveda",
+      "icd11_tm2_code": "SM31.0",
+      "icd11_tm2_term": "Reproductive-capacity disorder (TM2)",
+      "icd11_biomed_code": "HA01",
+      "synonyms": ["Erectile dysfunction"],
+      "keywords": ["klaibya", "erectile", "impotence", "sexual weakness"]
+    },
+    {
+      "namaste_code": "APA-36",
+      "namaste_term": "Artava Vyapad",
+      "namaste_system": "ayurveda",
+      "icd11_tm2_code": "SM31.1",
+      "icd11_tm2_term": "Menstrual disorder (TM2)",
+      "icd11_biomed_code": "GA20",
+      "synonyms": ["Menstrual disorder", "Dysmenorrhoea"],
+      "keywords": ["artava", "menstrual", "period pain", "irregular periods", "dysmenorrhoea"]
+    }
+  ]
+}

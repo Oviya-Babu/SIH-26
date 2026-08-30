@@ -1,0 +1,245 @@
+{
+  "$comment": [
+    "Patient-facing strings for general_medicine v1, keyed by stable field id.",
+    "",
+    "voice_prompt — spoken by TTS. Conversational, one idea per sentence.",
+    "touch_label  — short on-screen question. Must fit a large-type kiosk header.",
+    "help         — plain-language expansion, shown on tapping the help icon.",
+    "confirm      — read back to the respondent when the field is confirm_back or",
+    "               when ASR confidence lands in the confirm band (§10).",
+    "",
+    "Option labels come from clinical.json unless overridden here, so a code such",
+    "as 'diabetes' is translated once for every field that offers it."
+  ],
+
+  "groups": {
+    "chief_complaint": "Your main problem",
+    "hpi": "About the problem",
+    "review_of_systems": "Other symptoms",
+    "past_medical_history": "Past illnesses",
+    "past_surgical_history": "Past operations",
+    "procedure_history": "Tests and procedures",
+    "medications": "Medicines you take",
+    "allergies": "Allergies",
+    "family_history": "Family health",
+    "personal_history": "Daily habits",
+    "ample_fast_path": "A few urgent questions"
+  },
+
+  "fields": {
+    "gm.cc.primary_complaint": {
+      "voice_prompt": "What is the main problem that brought you to the hospital today? You can say it, or touch the picture that matches.",
+      "touch_label": "What is your main problem today?",
+      "help": "Choose the one problem that troubles you the most. You can tell the doctor about other problems later.",
+      "confirm": "You said your main problem is {answer}. Is that correct?"
+    },
+    "gm.cc.other_detail": {
+      "voice_prompt": "Please tell me in your own words what the problem is.",
+      "touch_label": "Tell us about your problem",
+      "help": "Say or type it in your own words. There is no wrong answer."
+    },
+    "gm.cc.duration_of_concern": {
+      "voice_prompt": "How long have you had this problem?",
+      "touch_label": "How long have you had this?",
+      "help": "Choose a number, then choose hours, days, weeks, months or years."
+    },
+
+    "gm.hpi.site": {
+      "voice_prompt": "Where exactly do you feel it? Touch that part of the body on the screen.",
+      "touch_label": "Where do you feel it?",
+      "help": "Touch the picture of the body where you feel it. You can choose more than one place.",
+      "confirm": "You showed me {answer}. Is that right?"
+    },
+    "gm.hpi.character": {
+      "voice_prompt": "How does it feel? You can choose more than one.",
+      "touch_label": "How does it feel?",
+      "help": "Choose whatever comes closest. If none of these fit, choose 'I cannot describe it'."
+    },
+    "gm.hpi.radiation": {
+      "voice_prompt": "Does the feeling spread anywhere else in your body?",
+      "touch_label": "Does it spread anywhere?",
+      "help": "For example, some people feel chest pain moving into the arm or jaw."
+    },
+    "gm.hpi.associated_symptoms": {
+      "voice_prompt": "Along with this, do you have any of these? You can choose more than one.",
+      "touch_label": "Anything else along with it?",
+      "help": "These help the doctor understand how serious the problem may be. Choose all that you have."
+    },
+    "gm.hpi.time_course": {
+      "voice_prompt": "Since it started, how has it changed?",
+      "touch_label": "How has it changed?",
+      "help": "Think about whether it stays the same, comes and goes, or is getting worse."
+    },
+    "gm.hpi.exacerbating": {
+      "voice_prompt": "Does anything make it worse?",
+      "touch_label": "What makes it worse?",
+      "help": "Choose all that apply. If nothing makes it worse, choose 'Nothing in particular'."
+    },
+    "gm.hpi.relieving": {
+      "voice_prompt": "Does anything make it better?",
+      "touch_label": "What makes it better?",
+      "help": "Choose all that apply. If nothing helps, choose 'Nothing helps'."
+    },
+    "gm.hpi.severity": {
+      "voice_prompt": "How bad is it right now? Zero means no trouble at all, and ten means the worst you can imagine. Touch the face that matches how you feel.",
+      "touch_label": "How bad is it right now?",
+      "help": "Slide or touch a face. There is no right or wrong answer — only how you feel."
+    },
+
+    "gm.ros.constitutional": {
+      "voice_prompt": "In the last few weeks, have you had any of these?",
+      "touch_label": "In the last few weeks",
+      "help": "These are general body changes. Choose all that you have noticed, or choose 'None of these'."
+    },
+    "gm.ros.cardiorespiratory": {
+      "voice_prompt": "Do you have any problem with your breathing or your heart?",
+      "touch_label": "Breathing or heart",
+      "help": "Choose all that apply, or choose 'None of these'."
+    },
+    "gm.ros.gastrointestinal": {
+      "voice_prompt": "Do you have any problem with your stomach or digestion?",
+      "touch_label": "Stomach and digestion",
+      "help": "Choose all that apply, or choose 'None of these'."
+    },
+    "gm.ros.genitourinary": {
+      "voice_prompt": "Do you have any problem when passing urine?",
+      "touch_label": "Passing urine",
+      "help": "Choose all that apply, or choose 'None of these'."
+    },
+    "gm.ros.neurological": {
+      "voice_prompt": "Have you had any of these problems with your head, nerves, or consciousness?",
+      "touch_label": "Head and nerves",
+      "help": "Choose all that apply, or choose 'None of these'."
+    },
+    "gm.ros.musculoskeletal": {
+      "voice_prompt": "Do you have any problem with your joints, muscles or walking?",
+      "touch_label": "Joints and muscles",
+      "help": "Choose all that apply, or choose 'None of these'."
+    },
+
+    "gm.pmh.conditions": {
+      "voice_prompt": "Has a doctor ever told you that you have any of these illnesses?",
+      "touch_label": "Illnesses you already have",
+      "help": "Choose all that a doctor has told you about, even if it is now controlled with medicine.",
+      "confirm": "So you have been told you have {answer}. Have I understood correctly?"
+    },
+    "gm.pmh.longest_condition_years": {
+      "voice_prompt": "How many years have you had the oldest of these illnesses?",
+      "touch_label": "For how many years?",
+      "help": "An approximate number is fine."
+    },
+    "gm.psh.had_surgery": {
+      "voice_prompt": "Have you ever had an operation?",
+      "touch_label": "Have you had any operation?",
+      "help": "This means any surgery, big or small, at any time in your life."
+    },
+    "gm.psh.surgeries": {
+      "voice_prompt": "Which operations have you had?",
+      "touch_label": "Which operations?",
+      "help": "Choose all that apply. If it is not on the list, choose 'Some other operation'."
+    },
+    "gm.proc.procedures": {
+      "voice_prompt": "Have you ever had any of these tests or procedures?",
+      "touch_label": "Tests and procedures",
+      "help": "These are tests or treatments done in a hospital. Choose all that apply, or 'None of these'."
+    },
+
+    "gm.med.taking_medicines": {
+      "voice_prompt": "Are you taking any medicines at present?",
+      "touch_label": "Are you taking medicines now?",
+      "help": "Include tablets, injections, inhalers, drops, and any Ayurvedic or herbal medicine."
+    },
+    "gm.med.list": {
+      "voice_prompt": "Please tell me the names of the medicines you take. If you do not know the names, you can show your prescription instead in the next step.",
+      "touch_label": "Which medicines do you take?",
+      "help": "Say or type whatever names you remember. You will also be able to photograph your prescription.",
+      "confirm": "I noted these medicines: {answer}. Is that correct?"
+    },
+    "gm.med.adherence": {
+      "voice_prompt": "Do you take these medicines as the doctor told you?",
+      "touch_label": "Do you take them regularly?",
+      "help": "Please answer honestly. It helps the doctor treat you correctly, and nobody will scold you."
+    },
+
+    "gm.allergy.has_allergy": {
+      "voice_prompt": "This is an important question. Has any medicine or food ever caused you a reaction, such as a rash, swelling or difficulty breathing?",
+      "touch_label": "Do you have any allergy?",
+      "help": "An allergy means your body reacted badly to something — a medicine, an injection, a food, or dust.",
+      "confirm": "I have noted your answer about allergies as {answer}. Is that correct?"
+    },
+    "gm.allergy.substances": {
+      "voice_prompt": "What caused the reaction?",
+      "touch_label": "What are you allergic to?",
+      "help": "Choose all that apply. If you do not know the name of the medicine, say so — that is still useful.",
+      "confirm": "You are allergic to {answer}. I will show this clearly to the doctor. Is that right?"
+    },
+    "gm.allergy.reaction": {
+      "voice_prompt": "What happened to you when you had the reaction?",
+      "touch_label": "What happened to you?",
+      "help": "This tells the doctor how serious the allergy is. Choose all that happened."
+    },
+
+    "gm.fh.conditions": {
+      "voice_prompt": "Has anyone in your close family — parents, brothers, sisters or children — had any of these?",
+      "touch_label": "Illnesses in your family",
+      "help": "Close family means parents, brothers, sisters and children. Choose all that apply."
+    },
+
+    "gm.ph.tobacco": {
+      "voice_prompt": "Do you use tobacco in any form — smoking, or chewing?",
+      "touch_label": "Do you use tobacco?",
+      "help": "This includes cigarettes, beedi, hookah, gutkha, khaini and paan masala. Please answer honestly."
+    },
+    "gm.ph.alcohol": {
+      "voice_prompt": "Do you drink alcohol?",
+      "touch_label": "Do you drink alcohol?",
+      "help": "This is only to keep you safe with medicines. Nobody will scold you."
+    },
+    "gm.ph.diet": {
+      "voice_prompt": "What kind of food do you usually eat?",
+      "touch_label": "What food do you eat?",
+      "help": "Choose the one closest to your usual eating pattern."
+    },
+    "gm.ph.physical_activity": {
+      "voice_prompt": "How active is your usual day?",
+      "touch_label": "How active is your day?",
+      "help": "Think about a normal working day for you."
+    },
+    "gm.ph.sleep": {
+      "voice_prompt": "How is your sleep?",
+      "touch_label": "How do you sleep?",
+      "help": "Choose the one that best matches most nights."
+    },
+    "gm.ph.occupational_exposure": {
+      "voice_prompt": "At your work, are you exposed to any of these?",
+      "touch_label": "At your work",
+      "help": "Choose all that apply, or 'None of these'. This includes farm and construction work."
+    },
+
+    "gm.ample.allergies": {
+      "voice_prompt": "Quickly — do you have any allergy to any medicine?",
+      "touch_label": "Any medicine allergy?",
+      "help": "The nurse is coming to help you. Just a few quick questions."
+    },
+    "gm.ample.medications": {
+      "voice_prompt": "Are you taking any medicine at present?",
+      "touch_label": "Any medicine now?",
+      "help": "Just yes, no, or not sure is enough."
+    },
+    "gm.ample.past_history": {
+      "voice_prompt": "Do you have any of these conditions?",
+      "touch_label": "Any of these conditions?",
+      "help": "Choose all that apply. This helps the nurse help you faster."
+    },
+    "gm.ample.last_oral_intake": {
+      "voice_prompt": "When did you last eat or drink anything?",
+      "touch_label": "When did you last eat or drink?",
+      "help": "This is important in case you need urgent treatment."
+    },
+    "gm.ample.events": {
+      "voice_prompt": "How did this problem begin today?",
+      "touch_label": "How did it begin?",
+      "help": "Choose whatever is closest to what happened."
+    }
+  }
+}
