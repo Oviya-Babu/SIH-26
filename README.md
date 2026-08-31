@@ -1,102 +1,222 @@
 # MediKiosk
 
-> **AI-Powered Pre-Consultation Clinical Intake & Medical-Record Intelligence Platform**
+MediKiosk is a hospital kiosk-first patient case-taking platform designed for high-volume OPD settings. The current implementation is a backend-first, protocol-driven clinical intake system focused on deterministic workflow, consent, safety checks, and auditability.
 
-MediKiosk is an AI-assisted, protocol-governed, evidence-backed, and physician-verified clinical intake system designed to capture structured patient context before consultations begin.
-
----
-
-## 🏗️ Architecture & Features
-
-- **Protocol-Governed State Machine**: Deterministic question engine dynamically guides the interview based on clinical ontologies (General Medicine v1) without allowing LLM hallucinations to determine clinical paths.
-- **Incremental Red-Flag Safety Engine**: Instant emergency rule evaluations (Acute Coronary Syndrome, severe dyspnoea, extreme pain) executed after every single answer with automated triage routing.
-- **Longitudinal Clinical Timeline**: Merges patient self-reporting and historical records with exact provenance.
-- **Evidence-Based Summary Generation**: Produces physician-ready summaries with 100% cited atomic fact tracing.
-- **Conflict & Contradiction Detection**: Flags discrepancies between patient claims and medical documentation for physician adjudication.
-- **Multi-Role Clinical Workspaces**:
-  - 🏥 **Patient Kiosk / Web**: Multilingual conversational voice & touch UI with specialized clinical widgets (Yes/No, Pain Severity slider with emojis, Body Map selector, Multi-Select, Duration Picker).
-  - 👨‍⚕️ **Physician Review Dashboard**: Priority triage queue, contradiction callouts, per-section Accept/Edit/Reject workflow, and clinical facts explorer.
-  - 🩺 **Staff / Triage Console**: Real-time red-flag alerts with SLA timers, acknowledge/resolve actions, and session monitoring.
-  - 📊 **Hospital Administration**: Analytics overview, clinical protocol management, safety rule inspection, and hash-chained audit trails.
+This repository is now grounded in the architecture and requirements described in [CLAUDE.md](CLAUDE.md). It is not a stale Node/React app; the current implementation is a Python FastAPI monolith with a governed clinical protocol engine, OPA-based authorization, PostgreSQL RLS, and infrastructure for the eventual kiosk/staff frontend surfaces.
 
 ---
 
-## 🛠️ Tech Stack
+## Current implementation status
 
-- **Monorepo**: npm workspaces
-- **Frontend**: React 19, TypeScript, Vite, React Router, Socket.IO Client, Vanilla CSS Design System
-- **Backend**: Node.js, Express, Socket.IO, TypeScript, Helmet, CORS
-- **Shared Package**: `@medikiosk/shared` (end-to-end type safety & clinical constants)
+The repo is in a real backend implementation phase, not a blank scaffolding project.
 
----
+### Implemented so far
 
-## 🚀 Quick Start
+- FastAPI API app and modular architecture in [services/api/medikiosk](services/api/medikiosk)
+- Clinical protocol engine and deterministic next-question logic
+- Session creation, consent gating, and interview flow
+- Red-flag engine and emergency escalation logic
+- Clinical fact model with provenance and respondent tracking
+- Privacy/redaction middleware and observability hooks
+- PostgreSQL migration structure and RLS-first database setup
+- OPA/Rego policy framework and RBAC checks
+- Docker Compose infrastructure for Postgres, Redis, RabbitMQ, Keycloak, OPA, MinIO, ClamAV, Prometheus, Grafana
+- Real tests for engine behavior and red-flag regression
+- Demo seed data and smoke validation script for the Phase 2 vertical slice
 
-### Prerequisites
-- Node.js (v18+)
-- npm (v9+)
+### Fully verified in this repo
 
-### Installation
+The repo’s own test configuration has been run successfully:
 
 ```bash
-# Clone the repository
-git clone <your-repo-url>
-cd SIH
-
-# Install all workspace dependencies
-npm install
+cd /home/aghila/SIH-26/services/api && .venv/bin/python -m pytest -q ../../tests/unit ../../tests/red_flag_regression
 ```
 
-### Running Locally
+This completed successfully with exit code 0.
 
-```bash
-# Start both Backend API and Frontend Client concurrently
-npm run dev
-```
+### Still pending / not fully implemented yet
 
-Or start them individually:
-
-```bash
-# Start backend API (Port 3001)
-npm run dev:server
-
-# Start frontend application (Port 5173)
-npm run dev:client
-```
-
-- **Frontend App**: `http://localhost:5173/`
-- **Backend API**: `http://localhost:3001/v1`
-- **WebSocket Gateway**: `ws://localhost:3001`
+- Real browser frontend apps under [apps](apps) are not present yet
+- Full kiosk UI and staff UI not implemented in this workspace
+- Voice pipeline, document OCR, AI summary generation, FHIR/HIS/ABDM production integration, and AYUSH full end-to-end flow are not finished as production-ready app surfaces
+- The repo is best described as Phase 2 / early Phase 3 territory, not a complete end-user clinical product
 
 ---
 
-## 📂 Project Structure
+## Architecture summary
 
+### Core backend
+
+- API: [services/api/medikiosk/main.py](services/api/medikiosk/main.py)
+- Clinical protocol engine: [services/api/medikiosk/modules/clinical_protocol](services/api/medikiosk/modules/clinical_protocol)
+- Session logic: [services/api/medikiosk/modules/session](services/api/medikiosk/modules/session)
+- Triage/red flags: [services/api/medikiosk/modules/triage](services/api/medikiosk/modules/triage)
+- Consent: [services/api/medikiosk/modules/consent](services/api/medikiosk/modules/consent)
+- Document handling: [services/api/medikiosk/modules/document](services/api/medikiosk/modules/document)
+- Security: [services/api/medikiosk/security](services/api/medikiosk/security)
+
+### Infrastructure and governance
+
+- Docker stack: [infra/docker/docker-compose.yml](infra/docker/docker-compose.yml)
+- Migrations: [migrations](migrations)
+- OPA policies: [policies/opa](policies/opa)
+- Test suite: [tests](tests)
+- Controlled content: [content](content)
+
+### Demo and validation
+
+- Seed demo data: [scripts/seed_demo.py](scripts/seed_demo.py)
+- Vertical slice smoke test: [scripts/smoke_vertical_slice.py](scripts/smoke_vertical_slice.py)
+
+---
+
+## Prerequisites
+
+- Python 3.12+
+- Docker + Docker Compose
+- Git
+- Optional: a local terminal with bash
+
+---
+
+## Quick start with requirements.txt
+
+The project includes a Python dependency file for the backend service at [services/api/requirements.txt](services/api/requirements.txt).
+
+### 1) Create and activate a virtual environment
+
+```bash
+cd /home/aghila/SIH-26/services/api
+python3.12 -m venv .venv
+source .venv/bin/activate
 ```
-SIH/
-├── apps/
-│   ├── client/          # Vite + React + TypeScript web application
-│   │   ├── src/
-│   │   │   ├── pages/   # Landing, PatientIntake, PhysicianDashboard, StaffConsole, AdminPanel
-│   │   │   ├── services/# REST API & WebSocket client
-│   │   │   └── index.css# Comprehensive clinical design system
-│   │   └── vite.config.ts
-│   └── server/          # Express + Socket.IO API server
-│       └── src/
-│           ├── db/      # In-memory clinical facts store
-│           ├── engines/ # Question Engine, Red-Flag Engine, Timeline Engine, Conflict Detector, Summary Generator
-│           ├── data/    # Clinical protocols & red-flag rule definitions
-│           └── index.ts # API router & WebSocket handlers
-├── packages/
-│   └── shared/          # Central domain models, clinical ontology types, constants
-├── package.json         # Workspace root scripts
-└── tsconfig.json        # Base TypeScript configuration
+
+### 2) Install dependencies
+
+```bash
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+This installs the FastAPI service dependencies and the dev/test tools needed for local verification.
+
+---
+
+## Start the project locally
+
+### Option A: Docker-based local stack (recommended)
+
+From the repo root:
+
+```bash
+cd /home/aghila/SIH-26
+./scripts/compose.sh up -d postgres redis rabbitmq keycloak opa minio clamav otel-collector prometheus grafana
+```
+
+Then run migrations:
+
+```bash
+export MEDIKIOSK_MIGRATION_DSN='postgresql://medikiosk_owner:dev_123098_$%_PostGRE_only_change_me@127.0.0.1:5432/medikiosk'
+python scripts/migrate.py --dsn "$MEDIKIOSK_MIGRATION_DSN"
+```
+
+Seed demo data:
+
+```bash
+python scripts/seed_demo.py --dsn "$MEDIKIOSK_MIGRATION_DSN"
+```
+
+Start the API:
+
+```bash
+cd /home/aghila/SIH-26/services/api
+source .venv/bin/activate
+uvicorn medikiosk.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+### Option B: run only the backend service without Docker
+
+This is possible for local FastAPI testing if the required services are already running elsewhere, but the canonical development path is still the Docker stack above.
+
+---
+
+## Verify the service is up
+
+### Health checks
+
+```bash
+curl http://localhost:8000/healthz
+curl http://localhost:8000/readyz
+```
+
+### Metadata endpoints
+
+```bash
+curl http://localhost:8000/v1/meta/languages
+```
+
+### Smoke test for the Phase 2 vertical slice
+
+The project includes a live smoke test that exercises the core workflow:
+
+```bash
+cd /home/aghila/SIH-26
+python scripts/smoke_vertical_slice.py --base-url http://127.0.0.1:8000 --device-credential "<device_credential_from_seed_demo>"
+```
+
+This validates the end-to-end sequence:
+
+- kiosk device auth
+- local registration
+- consent
+- session creation
+- deterministic question flow
+- clinical fact creation
+- red-flag escalation
+- session completion behavior
+
+---
+
+## Run tests
+
+### Unit + red-flag regression
+
+```bash
+cd /home/aghila/SIH-26/services/api
+source .venv/bin/activate
+python -m pytest -q ../../tests/unit ../../tests/red_flag_regression
+```
+
+### Security tests
+
+```bash
+python -m pytest -q ../../tests/security
 ```
 
 ---
 
-## 🔒 Security & Privacy
+## What contributors should do next
 
-- Strict RBAC (Patient, Physician, Nurse, Hospital Admin, Clinical Admin)
-- Immutable, tamper-evident hash-chained audit logging
-- DPDP & ABDM-compliant consent management gates
+The repo is already strong in the foundational clinical engine and security model. The next useful workstream is to continue in the sequence defined by [CLAUDE.md](CLAUDE.md):
+
+1. Finish the real frontend surfaces for kiosk and staff interfaces
+2. Complete the voice pipeline and multilingual interaction flow
+3. Validate OCR + document processing end-to-end
+4. Complete the AI summary evidence-citing path
+5. Add the AYUSH protocol use case and NAMASTE mapping flow
+6. Finalize FHIR/HIS/ABDM adapter testing and sandbox export
+7. Hardening and DPDP / VAPT readiness with real legal and security review
+
+---
+
+## Important note
+
+The project is intentionally backend-first and security-first. A lot of the real value is in the deterministic clinical engine, the audit trail, RBAC model, red-flag logic, and the compliance-oriented architecture. The browser UI is still the missing layer to make the system a fully user-visible product.
+
+For contributors, the correct starting point is:
+
+- [CLAUDE.md](CLAUDE.md)
+- [services/api](services/api)
+- [migrations](migrations)
+- [tests](tests)
+- [scripts/smoke_vertical_slice.py](scripts/smoke_vertical_slice.py)

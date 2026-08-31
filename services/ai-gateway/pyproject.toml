@@ -21,6 +21,10 @@ dependencies = [
     "pydantic-settings>=2.5.2",
     "httpx>=0.27.2",
     "structlog>=24.4.0",
+    # Phase 3: Voice (ASR/TTS/VAD)
+    "numpy>=1.26.0",  # For audio processing and VAD
+    "scipy>=1.12.0",  # Signal processing for noise suppression
+    # Note: webrtcvad, librosa, noisereduce are optional for real deployment
 ]
 
 [project.optional-dependencies]
