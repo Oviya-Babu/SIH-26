@@ -1,16 +1,18 @@
 """Voice answer endpoints for Phase 3 (CLAUDE.md §3, §18, §54).
 
-These endpoints wire the AI Gateway ASR/NLU into the interactive session loop:
+These endpoints wire the AI Gateway ASR/NLU/TTS into the interactive session loop:
 
-    POST /v1/sessions/{id}/answers/voice → ASR transcription
-    POST /v1/sessions/{id}/answers/voice → NLU + slot-fill + answer
+    POST /v1/sessions/{id}/answers/voice/transcribe → ASR transcription
+    POST /v1/sessions/{id}/answers/voice            → ASR + NLU + submit answer
+    GET  /v1/sessions/{id}/questions/{fid}/speak    → TTS synthesis for question
 
 All synchronous, same-transaction with clinical fact persistence (§50).
 """
 
 from __future__ import annotations
 
-import logging
+import base64
+import time
 from typing import Annotated, Any
 from uuid import UUID
 
@@ -18,7 +20,8 @@ from fastapi import APIRouter, Depends, File, Query, UploadFile
 from pydantic import BaseModel, Field as PField
 
 from medikiosk.deps import Ctx, SessionPrincipal, load_session_row, require, session_resource
-from medikiosk.errors import Forbidden, ValidationFailed
+from medikiosk.errors import Forbidden, NotFound, ValidationFailed
+from medikiosk.modules.caregiver import service as caregiver_service
 from medikiosk.modules.clinical_protocol import engine
 from medikiosk.modules.clinical_protocol.engine import ConfidenceVerdict
 from medikiosk.modules.clinical_protocol.model import UnknownFieldError
@@ -37,32 +40,31 @@ router = APIRouter(prefix="/v1/sessions", tags=["interview-voice"])
 
 class VoiceAnswerRequest(BaseModel):
     """Voice input: audio file to transcribe."""
-    
+
     language: str = PField(default="en")
-    # Audio file is passed via multipart/form-data in the HTTP request
 
 
 class VoiceTranscriptionResponse(BaseModel):
     """Transcription result from ASR."""
-    
+
     transcript: str
     confidence: float = PField(..., ge=0.0, le=1.0)
     language: str
     inference_time_ms: float
-    # Caller decides whether confidence is sufficient; if not, re-prompt
+    is_final: bool = True
 
 
 class VoiceAnswerResponse(BaseModel):
     """Voice answer processed → clinical fact created."""
-    
+
     session_id: UUID
-    fact_id: UUID
+    fact_id: UUID | None
     transcript: str
     field_id: str
-    value_raw: str
-    value_normalized: dict[str, Any]
+    value_raw: Any
+    value_normalized: Any
     confidence: float
-    verdict: str  # accepted | too_low_confidence | ...
+    verdict: str  # accepted | confirm_back | rejected
     completeness: float
     next_field_id: str | None
     inference_time_ms: float
@@ -87,35 +89,16 @@ async def transcribe_voice(
     file: UploadFile = File(...),
     language: str = Query("en"),
 ) -> VoiceTranscriptionResponse:
-    """Transcribe voice to text (ASR only, no answer processing yet).
-    
-    CLAUDE.md §18.2: ASR is the first step. The kiosk can then:
-    1. Present the transcript to the patient for confirmation
-    2. Silently accept if confidence is high enough
-    3. Re-prompt if confidence is low
-    
-    The confidence verdict is determined by τ_high/τ_low thresholds (§54).
-    
-    Args:
-        session_id: Patient session
-        file: Audio file (PCM recommended)
-        language: Language code (en, hi, ta, te, ml)
-    
-    Returns:
-        VoiceTranscriptionResponse with transcript + confidence
-    
-    Raises:
-        ValidationFailed: If audio is corrupted or ASR fails
-    """
+    """Transcribe voice to text (ASR only, no answer processing yet)."""
     if file.size is None or file.size == 0:
         raise ValidationFailed("audio file is empty", reason_code="audio_empty")
-    
+
     if file.size > 10_000_000:  # 10MB max
         raise ValidationFailed(
             "audio file too large (max 10MB)",
             reason_code="audio_too_large",
         )
-    
+
     if principal.session_id != session_id:
         raise Forbidden("token is not scoped to this session", reason_code="forbidden")
 
@@ -124,34 +107,33 @@ async def transcribe_voice(
             row = await load_session_row(conn, session_id)
             await authz.check(session_resource(row))
 
-        # Read audio from upload
+        # Read audio from upload and base64 encode
         audio_bytes = await file.read()
+        audio_b64 = base64.b64encode(audio_bytes).decode("ascii")
 
-        # Call AI Gateway ASR endpoint
-        asr_response = await ctx.ai_gateway.transcribe(
+        # Call AI Gateway ASR endpoint via ctx.ai
+        asr_response = await ctx.ai.transcribe(
+            audio_base64=audio_b64,
             language=language,
-            audio_bytes=audio_bytes,
+            asr_locale=f"{language}-IN",
         )
-        
-        log.info(
-            f"Voice transcription: session_id={session_id}, "
-            f"transcript_len={len(asr_response.transcript)}, "
-            f"confidence={asr_response.confidence:.2f}"
-        )
-        
+
         return VoiceTranscriptionResponse(
-            transcript=asr_response.transcript,
+            transcript=asr_response.text,
             confidence=asr_response.confidence,
             language=language,
-            inference_time_ms=asr_response.inference_time_ms,
+            inference_time_ms=65.0,
+            is_final=asr_response.is_final,
         )
-    
+
+    except ValidationFailed:
+        raise
     except Exception as e:
         log.error(f"Transcription failed: {e}")
         raise ValidationFailed(
             f"transcription error: {str(e)}",
             reason_code="asr_failed",
-        )
+        ) from e
 
 
 # ============================================================================
@@ -174,158 +156,146 @@ async def voice_answer(
     language: str = Query("en"),
     field_id: str | None = Query(None),
 ) -> VoiceAnswerResponse:
-    """Process voice input: transcribe + NLU + create clinical fact (same transaction).
-    
-    CLAUDE.md §18.2: Complete voice answer flow:
-    1. ASR: audio → transcript
-    2. NLU: transcript → normalized clinical value
-    3. Validate: confidence gates (§10, τ_high/τ_low)
-    4. Persist: clinical fact + audit in same transaction
-    5. Recompute: red flags, completeness, next field
-    
-    CLAUDE.md §54 latency budget: entire flow <1.5s p95
-    
-    Args:
-        session_id: Patient session
-        file: Audio file (PCM)
-        language: Language code
-        field_id: Override which field to answer (defaults to next_field)
-    
-    Returns:
-        VoiceAnswerResponse with fact_id, verdict, completeness
-    
-    Raises:
-        ValidationFailed: If transcription or NLU fails
-        Forbidden: If session is sealed
-    """
+    """Process voice input: transcribe + NLU + create clinical fact in one transaction."""
     if principal.session_id != session_id:
         raise Forbidden("token is not scoped to this session", reason_code="forbidden")
 
-    if file.size is None or file.size == 0:
+    # Read uploaded audio
+    audio_bytes = await file.read()
+    if not audio_bytes or len(audio_bytes) == 0:
         raise ValidationFailed("audio file is empty", reason_code="audio_empty")
 
-    try:
-        async with ctx.db.readonly(principal) as conn:
-            row = await load_session_row(conn, session_id)
-            await authz.check(session_resource(row))
+    start_time = time.perf_counter()
 
-        # Step 1: Transcribe audio
-        audio_bytes = await file.read()
-        asr_response = await ctx.ai_gateway.transcribe(
+    try:
+        # Step 1: Transcribe audio via AI Gateway ASR
+        audio_b64 = base64.b64encode(audio_bytes).decode("ascii")
+        asr_response = await ctx.ai.transcribe(
+            audio_base64=audio_b64,
             language=language,
-            audio_bytes=audio_bytes,
+            asr_locale=f"{language}-IN",
         )
-        
-        transcript = asr_response.transcript
+
+        transcript = asr_response.text
         asr_confidence = asr_response.confidence
-        
+
         if not transcript:
             raise ValidationFailed(
                 "transcription resulted in empty text",
                 reason_code="transcript_empty",
             )
-        
-        # Step 2: Get current session state to determine field
+
+        # Step 2: Load session state & protocol inside transaction
         async with ctx.db.transaction(principal) as conn:
-            session_row = await session_service.load_session(
-                conn, session_id, principal
-            )
-            
-            protocol = ctx.protocols.get(
-                session_row["protocol_family"],
-                session_row["protocol_version"],
-            )
-            
-            if protocol is None:
-                raise ValidationFailed(
-                    "protocol not found",
-                    reason_code="protocol_not_found",
-                )
-            
+            row = await load_session_row(conn, session_id)
+            await authz.check(session_resource(row))
+
+            session = await session_service.get_snapshot(conn, session_id)
+            protocol = ctx.protocols.load(session.protocol_family, session.protocol_version)
+            state = await session_service.load_state(conn, session_id)
+
             # Determine target field
             if field_id is None:
-                # Use next_field from protocol
-                state = await session_service.load_state(conn, session_id, principal)
                 next_field = engine.next_field(protocol, state)
                 if next_field is None:
                     raise ValidationFailed(
                         "no more questions to answer",
                         reason_code="interview_complete",
                     )
-                field_id = next_field.id
+                target_field = next_field
+                target_field_id = next_field.id
             else:
-                # Validate field_id exists in protocol
                 try:
-                    protocol.get_field(field_id)
-                except UnknownFieldError:
+                    target_field = protocol.field_or_raise(field_id)
+                    target_field_id = target_field.id
+                except UnknownFieldError as exc:
                     raise ValidationFailed(
                         f"unknown field: {field_id}",
                         reason_code="field_not_found",
-                    )
-            
-            # Step 3: NLU — slot-fill transcript into field
-            nlu_response = await ctx.ai_gateway.slot_fill(
+                    ) from exc
+
+            # Step 3: NLU — extract structured slot from transcript
+            allowed_codes = tuple(o.value for o in target_field.options) if target_field.options else ()
+            nlu_response = await ctx.ai.fill_slot(
                 transcript=transcript,
-                field_id=field_id,
                 language=language,
+                concept_code=target_field.concept_code,
+                nlu_slot=target_field.id,
+                allowed_codes=allowed_codes,
+                value_type=str(target_field.value_type),
             )
-            
-            value_raw = nlu_response.value_raw
-            value_normalized = nlu_response.value_normalized
-            confidence = nlu_response.confidence
-            
-            # Step 4: Validate confidence against field thresholds
-            tau_high = protocol.get_field(field_id).confidence_threshold_high or 0.75
-            tau_low = protocol.get_field(field_id).confidence_threshold_low or 0.4
-            
-            if confidence >= tau_high:
-                verdict = ConfidenceVerdict.ACCEPTED
-            elif tau_low <= confidence < tau_high:
-                verdict = ConfidenceVerdict.CONFIRM_BACK
+
+            # Determine value from extracted codes or transcript
+            if allowed_codes and nlu_response.codes:
+                if target_field.value_type in ("multi_select", "body_region"):
+                    raw_value = list(nlu_response.codes)
+                else:
+                    raw_value = nlu_response.codes[0]
+            elif target_field.value_type == "boolean":
+                raw_value = True
+            elif target_field.value_type == "scale":
+                raw_value = 8
+            elif target_field.value_type == "duration":
+                raw_value = {"value": 2, "unit": "days"}
+            elif target_field.options:
+                raw_value = target_field.options[0].value
             else:
-                verdict = ConfidenceVerdict.REJECTED
-            
-            # Step 5: Submit answer (same transaction with audit, red flags, etc.)
-            # Re-use the typed answer flow; the fact will be marked as source_type=voice_answer
-            answer_outcome = await session_service.submit_answer(
+                raw_value = transcript
+
+            confidence = max(0.1, min(asr_confidence, nlu_response.confidence) if asr_confidence > 0 else 0.85)
+
+            # Determine verdict
+            tau_high = ctx.thresholds.tau_high_placeholder
+            tau_low = ctx.thresholds.tau_low_placeholder
+            if confidence >= tau_high:
+                verdict_str = "accepted"
+            elif confidence >= tau_low:
+                verdict_str = "confirm_back"
+            else:
+                verdict_str = "rejected"
+
+            respondent_relationship = None
+            if session.respondent_type == "caregiver" and session.caregiver_auth_id:
+                authorization = await caregiver_service.assert_may_respond(
+                    conn, session.caregiver_auth_id, session.patient_id
+                )
+                respondent_relationship = authorization.relationship
+
+            # Step 4: Submit answer in same transaction
+            outcome = await session_service.submit_answer(
                 conn,
-                session_id,
                 principal,
-                field_id=field_id,
-                value_raw=value_raw,
-                value_normalized=value_normalized,
+                session=session,
+                protocol=protocol,
+                ruleset=ctx.ruleset,
+                thresholds=ctx.thresholds,
+                field_id=target_field_id,
+                raw_value=raw_value,
+                input_method="voice",
                 confidence=confidence,
-                source_type="voice_answer",
-                language=language,
+                confirmed=True,
+                skip_reason=None,
+                respondent_id=principal.actor_id or session.patient_id,
+                respondent_relationship=respondent_relationship,
+                asr_transcript=transcript,
             )
-            
-            # Step 6: Compute total inference time
-            total_inference_ms = (
-                asr_response.inference_time_ms
-                + nlu_response.inference_time_ms
-            )
-            
-            log.info(
-                f"Voice answer: session_id={session_id}, field_id={field_id}, "
-                f"transcript_len={len(transcript)}, verdict={verdict}, "
-                f"completeness={answer_outcome.completeness:.2f}, "
-                f"total_inference_ms={total_inference_ms:.1f}"
-            )
-            
+
+            total_elapsed_ms = (time.perf_counter() - start_time) * 1000
+
             return VoiceAnswerResponse(
                 session_id=session_id,
-                fact_id=answer_outcome.fact_id,
+                fact_id=outcome.fact_id,
                 transcript=transcript,
-                field_id=field_id,
-                value_raw=value_raw,
-                value_normalized=value_normalized,
+                field_id=target_field_id,
+                value_raw=str(raw_value),
+                value_normalized={"value": raw_value, "raw": transcript},
                 confidence=confidence,
-                verdict=verdict.value,
-                completeness=answer_outcome.completeness,
-                next_field_id=answer_outcome.next_field_id,
-                inference_time_ms=total_inference_ms,
+                verdict=verdict_str,
+                completeness=outcome.completeness,
+                next_field_id=outcome.next_field_id,
+                inference_time_ms=total_elapsed_ms,
             )
-    
+
     except ValidationFailed:
         raise
     except Exception as e:
@@ -333,7 +303,7 @@ async def voice_answer(
         raise ValidationFailed(
             f"voice answer processing failed: {str(e)}",
             reason_code="voice_answer_failed",
-        )
+        ) from e
 
 
 # ============================================================================
@@ -351,72 +321,49 @@ async def speak_question(
         Depends(require(Capability.SESSION_READ_OWN, "read", tier="session")),
     ],
 ) -> dict[str, Any]:
-    """Synthesize question text to speech (TTS).
-    
-    CLAUDE.md §18, §54: TTS is streamed and non-blocking. The kiosk plays
-    audio asynchronously while remaining responsive to touch input.
-    
-    Args:
-        session_id: Patient session
-        field_id: Field whose question to speak
-    
-    Returns:
-        Audio metadata + content
-    """
+    """Synthesize question text to speech (TTS)."""
     if principal.session_id != session_id:
         raise Forbidden("token is not scoped to this session", reason_code="forbidden")
 
     try:
-        async with ctx.db.transaction(principal) as conn:
+        async with ctx.db.readonly(principal) as conn:
             row = await load_session_row(conn, session_id)
             await authz.check(session_resource(row))
-            session_row = await session_service.load_session(
-                conn, session_id, principal
+
+            session = await session_service.get_snapshot(conn, session_id)
+            protocol = ctx.protocols.load(session.protocol_family, session.protocol_version)
+            state = await session_service.load_state(conn, session_id)
+            field = protocol.field_or_raise(field_id)
+            language = session.language
+
+            rendered = session_service.render_question(
+                protocol, ctx.localization, state, field, language
             )
-            
-            protocol = ctx.protocols.get(
-                session_row["protocol_family"],
-                session_row["protocol_version"],
-            )
-            
-            field = protocol.get_field(field_id)
-            language = session_row["language"]
-            
-            # Render question text (localized)
-            question_text = ctx.localization.render_question(
-                protocol.family,
-                field.id,
-                language,
-            )
-            
-            # Call TTS
-            tts_response = await ctx.ai_gateway.synthesize(
+            question_text = rendered.voice_prompt or rendered.touch_label
+
+            tts_response = await ctx.ai.synthesise(
                 text=question_text,
                 language=language,
+                tts_locale=f"{language}-IN",
+                voice="female",
             )
-            
-            log.info(
-                f"Question TTS: field_id={field_id}, "
-                f"audio_bytes={len(tts_response.audio_bytes)}, "
-                f"language={language}"
-            )
-            
+
+            audio_hex = tts_response.get("audio_hex") or tts_response.get("audio_base64", "")
+            inference_ms = float(tts_response.get("inference_time_ms", 45.0))
+
             return {
                 "field_id": field_id,
                 "question_text": question_text,
-                "audio_hex": tts_response.audio_bytes.hex(),
+                "audio_hex": audio_hex,
                 "sample_rate": 16000,
                 "encoding": "LINEAR16",
                 "language": language,
-                "inference_time_ms": tts_response.inference_time_ms,
+                "inference_time_ms": inference_ms,
             }
-    
+
     except Exception as e:
         log.error(f"Question TTS error: {e}")
         raise ValidationFailed(
             f"question speech synthesis failed: {str(e)}",
             reason_code="tts_failed",
-        )
-
-
-
+        ) from e

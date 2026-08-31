@@ -12,8 +12,9 @@ from medikiosk_ai.main import app
 
 @pytest.fixture
 def ai_client():
-    """Test client for AI Gateway."""
-    return TestClient(app)
+    """Test client for AI Gateway with lifespan startup."""
+    with TestClient(app) as client:
+        yield client
 
 
 def test_ai_gateway_health(ai_client):
