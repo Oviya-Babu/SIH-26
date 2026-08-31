@@ -34,6 +34,7 @@ from medikiosk.routers import (
     session as session_router,
     triage,
     upload,
+    voice,
 )
 
 log = get_logger(__name__)
@@ -190,6 +191,7 @@ def create_app(settings: Settings | None = None, *, connect_db: bool = True) -> 
         kiosk.router,
         consent.router,
         session_router.router,
+        voice.router,
         upload.router,
         triage.router,
         physician.router,

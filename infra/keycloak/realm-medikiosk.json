@@ -156,6 +156,7 @@
       ]
     }
   ],
+  "browserFlow": "medikiosk-browser-mfa",
   "users": [
     {
       "username": "nurse.genmed",
