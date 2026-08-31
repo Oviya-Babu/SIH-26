@@ -113,8 +113,12 @@ class Settings(BaseSettings):
     allowed_upload_mime: tuple[str, ...] = ("image/jpeg", "image/png", "application/pdf")
 
     cors_allow_origins: tuple[str, ...] = (
+        "http://localhost:3000",
         "http://localhost:3100",
         "http://localhost:3200",
+        "http://127.0.0.1:3200",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
     )
 
     @field_validator("session_token_secret")

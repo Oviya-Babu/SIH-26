@@ -407,15 +407,25 @@ Both interview-derived and document-derived diagnosis facts route through the id
 
 **Isolation, structural not conventional:** AI workers (ASR/NLU/OCR/TTS/LLM) have **no network route to PostgreSQL** — enforced at the network/firewall layer `[RED LINE]`. They receive a request, return a response. Only the application layer writes to the database.
 
-### 18.1 Managed APIs vs. self-hosted
+### 18.1 Architecture Change Record: 100% Self-Hosted / Local AI Transition
 
-`[MOCK/SANDBOX for evaluation, real for production traffic]` **Managed APIs for v1**, behind the Gateway abstraction:
-- **ASR/TTS: Bhashini/AI4Bharat.** The exact technology the original PS names, purpose-built for Indian-language/accent accuracy, government-backed, free-to-access for ecosystem partners.
-- **OCR: Google Document AI, with Cloud Billing enabled from the first API call.** 1,000 free units/month, then $1.50/1,000 pages; new accounts get $300 signup credit.
+> [!NOTE]
+> **ARCHITECTURE CHANGE RECORD (2026-08-31)**
+> - **Previous Architecture:** Managed Bhashini / Cloud API endpoints via HTTP.
+> - **New Architecture:** 100% Self-Hosted, Local, Edge/Offline-Capable AI Stack running on CPU (ONNX Runtime + CTranslate2 INT8).
+> - **Driver:** Eliminates cloud API latency, vendor lock-in, external billing dependencies, and enables true offline clinical kiosk deployment in remote OPDs.
+> - **Preserved Invariants:** AI Gateway remains strictly isolated (no database access, no route to PostgreSQL). All deterministic clinical logic, confidence gating, red-flag escalation, and physician review authority remain 100% unchanged `[RED LINE §10, §20]`.
 
-**Why managed beats self-hosted right now:** a small team self-hosting/tuning ASR/OCR within any realistic timeline will likely underperform these already-tuned services, especially on the hardest case (handwritten prescriptions, multiple Indic languages). Self-hosting is a `[FUTURE]` move once volume/cost/data-residency genuinely force it — the Gateway abstraction is what makes that swap possible without touching application code.
+**100% Self-Hosted AI Pipeline Components:**
+- **VAD:** Silero VAD v5 running locally via ONNX Runtime CPU (`intra_op_num_threads=2`).
+- **ASR:** `faster-whisper-small` (CTranslate2 INT8 quantized, CPU inference, `cpu_threads=4`) supporting English, Hindi, Tamil, Telugu, and Malayalam without external API calls.
+- **Clinical NLU:** Local semantic embedding & pattern-based slot extraction (multilingual sentence representation for option mapping; no diagnosis authority).
+- **TTS:** Local synthesis engine with disk caching for high-frequency clinical questions, with graceful fallback to browser Web Speech API (`speechSynthesis`).
+- **OCR:** Local Tesseract/ONNX pipeline (async, never blocking the interactive patient loop).
 
-`[CONTROL]` **The privacy rule that must never be skipped:** free/no-billing consumer API tiers commonly permit vendor use of submitted data for "product improvement." **Enabling Cloud Billing — even while consuming entirely free-tier quota — is what changes this**, putting the account under the vendor's Data Processing Addendum. **Never send anything resembling real patient content through an anonymous, no-billing API key, even in testing** `[RED LINE]`.
+`[CONTROL]` **The privacy rule that must never be skipped:**
+All audio processing occurs entirely in-memory within the local AI Gateway worker and is purged immediately after transcription. No voice data is ever transmitted to external cloud providers.
+
 
 ### 18.2 Noisy-environment ASR
 

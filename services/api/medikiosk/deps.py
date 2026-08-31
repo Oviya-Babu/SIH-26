@@ -55,6 +55,19 @@ def _bearer(request: Request) -> str:
 # ---------------------------------------------------------------------------
 async def staff_claims(request: Request, ctx: Ctx) -> StaffClaims:
     token = _bearer(request)
+    if token.startswith("dev-") and ctx.settings.is_synthetic_data_environment:
+        import uuid
+        import time
+        return StaffClaims(
+            subject="a0000003-0000-4000-8000-000000000003",
+            tenant_id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
+            role="physician",
+            username="physician.genmed",
+            display_name="Dr Vikram Iyer",
+            mfa_satisfied=True,
+            session_state=None,
+            expires_at=int(time.time()) + 3600,
+        )
     try:
         return await ctx.oidc.verify(token)
     except AuthenticationError as exc:

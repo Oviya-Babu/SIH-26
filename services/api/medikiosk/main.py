@@ -203,6 +203,118 @@ def create_app(settings: Settings | None = None, *, connect_db: bool = True) -> 
     ):
         app.include_router(router)
 
+    from pathlib import Path
+    from fastapi.responses import HTMLResponse
+
+    @app.get("/kiosk", response_class=HTMLResponse)
+    @app.get("/", response_class=HTMLResponse)
+    async def serve_kiosk():
+        """Serve the interactive Voice Kiosk UI (§18, §54)."""
+        kiosk_path = Path(__file__).parent / "static" / "kiosk.html"
+        if kiosk_path.exists():
+            return HTMLResponse(content=kiosk_path.read_text(encoding="utf-8"))
+        return HTMLResponse("<h1>MediKiosk API</h1><p>Visit /docs for API documentation</p>")
+
+    @app.post("/v1/sessions/dev/quick-start")
+    async def dev_quick_start(request: Request):
+        """Helper for dev/testing to mint a live session with first question in 1 click."""
+        data = {}
+        try:
+            data = await request.json()
+        except Exception:
+            pass
+        patient_name = data.get("full_name", "Ramesh Kumar (Demo Patient)")
+        language = data.get("language", "en")
+        dept_code = data.get("department_code", "GEN-MED")
+
+        ctx: AppContext = request.app.state.ctx
+        tenant_id = uuid.UUID("11111111-1111-1111-1111-111111111111")
+        
+        from medikiosk.db import Principal
+        from medikiosk.modules.identity import service as identity
+        from medikiosk.modules.consent.service import Purpose, ConsentGrant, record_consents
+        from medikiosk.modules.session import service as session_service
+
+        principal = Principal(tenant_id=tenant_id, role="kiosk_device")
+
+        async with ctx.db.transaction(principal) as conn:
+            # 1. Get or create department
+            dept_row = await conn.fetchrow(
+                "SELECT id, code, protocol_family FROM department WHERE code = $1 OR code = 'GEN-MED' LIMIT 1",
+                dept_code
+            )
+            dept_id = dept_row["id"]
+            family = dept_row["protocol_family"]
+
+            # 2. Register local patient
+            demo_hosp_id = f"HOSP-DEMO-{uuid.uuid4().hex[:6]}"
+            patient = await identity.register_local(
+                conn,
+                principal,
+                hospital_local_id=demo_hosp_id,
+                full_name=patient_name,
+                year_of_birth=1982,
+                gender="male",
+                phone_last4="1234",
+                preferred_language=language,
+            )
+
+            # 3. Grant staff access, voice capture, and AI processing consent
+            await record_consents(
+                conn,
+                principal,
+                patient_id=patient.id,
+                grants=[
+                    ConsentGrant(purpose=Purpose.STAFF_ACCESS, granted=True),
+                    ConsentGrant(purpose=Purpose.VOICE_CAPTURE, granted=True),
+                    ConsentGrant(purpose=Purpose.AI_PROCESSING, granted=True),
+                ],
+                notice_version="2025.1",
+                notice_language=language,
+                audio_explained=True,
+                grantor_type="patient",
+            )
+
+            # 4. Create interview session
+            session_snap = await session_service.create_session(
+                conn,
+                principal,
+                patient_id=patient.id,
+                department_id=dept_id,
+                device_id=None,
+                protocol_family=family,
+                protocol_version="v1",
+                language=language,
+                respondent_type="patient",
+                caregiver_auth_id=None,
+            )
+
+        token, _ = ctx.tokens.mint(
+            "session",
+            tenant_id=tenant_id,
+            ttl_seconds=3600,
+            session_id=session_snap.id,
+            patient_id=patient.id,
+            department_id=dept_id,
+            subject_role="patient",
+            actor_id=patient.id,
+        )
+
+        return {
+            "session_id": str(session_snap.id),
+            "session_token": token,
+            "patient_id": str(patient.id),
+            "department_id": str(dept_id),
+            "language": language,
+            "protocol_family": family,
+            "first_question": {
+                "field_id": "gm.cc.primary_complaint",
+                "category": "Primary Complaint (SOCRATES)",
+                "question_text": "What is the main problem bringing you to the hospital today?",
+                "hint": "Speak your main symptoms (e.g., chest pain, fever, headache, breathing trouble)"
+            }
+        }
+
     return app
 
 

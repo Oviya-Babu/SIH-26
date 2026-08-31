@@ -188,7 +188,28 @@ export default function StaffWorkspace() {
     }
   };
 
-  if (!token) return <main className="centered"><p>{status}</p></main>;
+  if (!token) return (
+    <main className="centered" style={{ maxWidth: "480px", margin: "auto", textAlign: "center", padding: "2rem" }}>
+      <div style={{ background: "#fff", border: "1px solid #dbe3ee", borderRadius: "16px", padding: "2.5rem 2rem", boxShadow: "0 10px 25px -5px rgba(0,0,0,0.05)" }}>
+        <h2 style={{ marginBottom: "0.5rem" }}>MediKiosk Staff Workspace</h2>
+        <p style={{ color: "#64748b", marginBottom: "1.5rem" }}>Physician review &amp; clinical attestation</p>
+        <p style={{ minHeight: "1.5rem", color: "#334155", fontSize: "0.9rem", marginBottom: "1.5rem" }}>{status}</p>
+        <button
+          style={{ width: "100%", padding: "12px", background: "#1d4ed8", color: "#fff", border: "none", borderRadius: "8px", fontWeight: "700", cursor: "pointer", marginBottom: "0.75rem" }}
+          onClick={() => {
+            const devToken = "dev-physician-token-vikram-iyer";
+            setToken(devToken);
+            void loadQueue(devToken);
+          }}
+        >
+          👨‍⚕️ Enter as Dr. Vikram Iyer (Demo Physician)
+        </button>
+        <a href="http://localhost:8000/kiosk" target="_blank" style={{ display: "inline-block", fontSize: "0.85rem", color: "#2563eb", marginTop: "1rem", textDecoration: "none" }}>
+          🎙️ Open Patient Voice Kiosk (Port 8000) &rarr;
+        </a>
+      </div>
+    </main>
+  );
 
   return (
     <main>
