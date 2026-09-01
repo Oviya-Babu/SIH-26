@@ -827,6 +827,11 @@
     let pcmChunks = [];
     let analyser = null;
     let animationFrameId = null;
+    let audioProcessor = null;
+    let speechDetected = false;
+    let lastSpeechAt = 0;
+    let captureStartedAt = 0;
+    let captureSampleRate = 16000;
 
     const API_BASE = window.location.origin;
 
@@ -1328,31 +1333,52 @@
     }
 
     async function startMicrophone() {
-      isRecording = true;
       pcmChunks = [];
-
-      document.getElementById('micBtn').classList.add('recording');
-      document.getElementById('micGlow').classList.add('recording');
-      document.getElementById('micStatus').innerText = I18N[currentLanguage]?.micListening || "Listening... (Tap again when finished)";
+      speechDetected = false;
+      lastSpeechAt = 0;
+      captureStartedAt = performance.now();
 
       try {
-        audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
         mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+        await audioContext.resume();
+        captureSampleRate = audioContext.sampleRate;
+        isRecording = true;
+        document.getElementById('micBtn').classList.add('recording');
+        document.getElementById('micGlow').classList.add('recording');
+        document.getElementById('micStatus').innerText = I18N[currentLanguage]?.micListening || "Listening... (speak now)";
         const source = audioContext.createMediaStreamSource(mediaStream);
 
         analyser = audioContext.createAnalyser();
         analyser.fftSize = 256;
         source.connect(analyser);
 
-        const processor = audioContext.createScriptProcessor(4096, 1, 1);
-        processor.onaudioprocess = (e) => {
+        audioProcessor = audioContext.createScriptProcessor(4096, 1, 1);
+        audioProcessor.onaudioprocess = (e) => {
           if (!isRecording) return;
           const input = e.inputBuffer.getChannelData(0);
-          pcmChunks.push(new Float32Array(input));
+          const chunk = new Float32Array(input);
+          let sumSquares = 0;
+          for (const sample of chunk) sumSquares += sample * sample;
+          const rms = Math.sqrt(sumSquares / chunk.length);
+          if (rms >= 0.005) {
+            speechDetected = true;
+            lastSpeechAt = performance.now();
+            document.getElementById('micStatus').innerText = "Listening... speech detected";
+          }
+          pcmChunks.push(chunk);
+          // End naturally after speech followed by silence, while retaining a
+          // manual stop button for patients who pause between words.
+          if (speechDetected && performance.now() - lastSpeechAt > 1200) stopMicrophone();
         };
 
-        source.connect(processor);
-        processor.connect(audioContext.destination);
+        source.connect(audioProcessor);
+        // ScriptProcessor callbacks require an output connection. Mute it so
+        // the microphone is never played back through the kiosk speaker.
+        const mute = audioContext.createGain();
+        mute.gain.value = 0;
+        audioProcessor.connect(mute);
+        mute.connect(audioContext.destination);
 
         drawLiveWaveform();
 
@@ -1375,10 +1401,17 @@
       document.getElementById('micStatus').innerText = I18N[currentLanguage]?.micProcessing || "Processing your speech...";
 
       if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      if (audioProcessor) audioProcessor.disconnect();
       if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
-      if (audioContext) audioContext.close();
+      if (audioContext) await audioContext.close();
 
-      const wavBlob = encodeWavBlob(pcmChunks, 16000);
+      const wavBlob = encodeWavBlob(pcmChunks, captureSampleRate);
+      if (!speechDetected || wavBlob.size <= 44) {
+        document.getElementById('micStatus').innerText = "No speech detected. Please speak clearly and try again.";
+        document.getElementById('micBtn').classList.remove('recording');
+        document.getElementById('micGlow').classList.remove('recording');
+        return;
+      }
       await submitVoiceRecording(wavBlob);
     }
 

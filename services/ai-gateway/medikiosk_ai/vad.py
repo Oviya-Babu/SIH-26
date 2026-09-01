@@ -113,8 +113,8 @@ class SileroVADEngine:
 
     def _reset_states(self) -> None:
         """Reset LSTM hidden states for a new audio stream."""
-        self._h = np.zeros((2, 1, 64), dtype=np.float32)
-        self._c = np.zeros((2, 1, 64), dtype=np.float32)
+        # Silero VAD v5 state is (2, 1, 128) — [2 layers, 1 batch, 128 units per layer]
+        self._state = np.zeros((2, 1, 128), dtype=np.float32)
 
     def speech_probability(self, audio_frame: np.ndarray) -> float:
         """Get speech probability for a single audio frame.
@@ -147,13 +147,11 @@ class SileroVADEngine:
                 {
                     "input": input_data,
                     "sr": sr,
-                    "h": self._h,
-                    "c": self._c,
+                    "state": self._state,
                 },
             )
             prob = float(outputs[0].item())
-            self._h = outputs[1]
-            self._c = outputs[2]
+            self._state = outputs[1]
             return prob
 
         except Exception as e:

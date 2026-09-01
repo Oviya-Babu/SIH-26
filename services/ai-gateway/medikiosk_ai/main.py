@@ -278,6 +278,27 @@ async def transcribe(
     else:
         audio_bytes = await request.body()
 
+    vad_result = None
+    if vad_engine is not None:
+        audio_array = asr_engine._decode_audio(audio_bytes)
+        segments = vad_engine.detect_speech_segments(audio_array)
+        vad_result = {
+            "has_speech": bool(segments),
+            "segment_count": len(segments),
+        }
+        if not segments:
+            return {
+                "text": "",
+                "transcript": "",
+                "confidence": 0.0,
+                "language": lang,
+                "is_final": is_final,
+                "model_version": "silero-vad-no-speech",
+                "inference_time_ms": 0.0,
+                "audio_duration_seconds": len(audio_array) / 16000,
+                "vad": vad_result,
+            }
+
     result = asr_engine.transcribe(audio_bytes, language=lang, is_final=is_final)
 
     return {
@@ -289,6 +310,7 @@ async def transcribe(
         "model_version": result.model_version,
         "inference_time_ms": result.inference_time_ms,
         "audio_duration_seconds": result.audio_duration_seconds,
+        "vad": vad_result,
     }
 
 
