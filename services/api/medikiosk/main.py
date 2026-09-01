@@ -19,7 +19,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from medikiosk.config import Settings, get_settings
 from medikiosk.context import AppContext
-from medikiosk.errors import MediKioskError
+from medikiosk.errors import MediKioskError, ValidationFailed
 from medikiosk.observability.logging_setup import configure_logging, get_logger
 from medikiosk.routers import (
     admin,
@@ -226,6 +226,10 @@ def create_app(settings: Settings | None = None, *, connect_db: bool = True) -> 
         patient_name = data.get("full_name", "Ramesh Kumar (Demo Patient)")
         language = data.get("language", "en")
         dept_code = data.get("department_code", "GEN-MED")
+        respondent_type = data.get("respondent_type", "patient")
+        caregiver_name = data.get("caregiver_name")
+        caregiver_relationship = data.get("caregiver_relationship")
+        caregiver_ack_method = data.get("caregiver_ack_method")
 
         ctx: AppContext = request.app.state.ctx
         tenant_id = uuid.UUID("11111111-1111-1111-1111-111111111111")
@@ -233,6 +237,7 @@ def create_app(settings: Settings | None = None, *, connect_db: bool = True) -> 
         from medikiosk.db import Principal
         from medikiosk.modules.identity import service as identity
         from medikiosk.modules.consent.service import Purpose, ConsentGrant, record_consents
+        from medikiosk.modules.caregiver import service as caregiver_service
         from medikiosk.modules.session import service as session_service
 
         principal = Principal(tenant_id=tenant_id, role="kiosk_device")
@@ -258,6 +263,23 @@ def create_app(settings: Settings | None = None, *, connect_db: bool = True) -> 
                 phone_last4="1234",
                 preferred_language=language,
             )
+
+            caregiver_auth_id = None
+            if respondent_type == "caregiver":
+                if not caregiver_name or not caregiver_relationship or caregiver_ack_method not in ("voice", "touch"):
+                    raise ValidationFailed(
+                        "caregiver details and patient acknowledgment are required",
+                        reason_code="caregiver_ack_required",
+                    )
+                authorization = await caregiver_service.record_patient_acknowledgment(
+                    conn,
+                    principal,
+                    patient_id=patient.id,
+                    caregiver_name=caregiver_name,
+                    relationship=caregiver_relationship,
+                    ack_method=caregiver_ack_method,
+                )
+                caregiver_auth_id = authorization.id
 
             # 3. Grant staff access, voice capture, and AI processing consent
             await record_consents(
@@ -285,8 +307,8 @@ def create_app(settings: Settings | None = None, *, connect_db: bool = True) -> 
                 protocol_family=family,
                 protocol_version="v1",
                 language=language,
-                respondent_type="patient",
-                caregiver_auth_id=None,
+                respondent_type=respondent_type,
+                caregiver_auth_id=caregiver_auth_id,
             )
 
         token, _ = ctx.tokens.mint(
@@ -296,7 +318,7 @@ def create_app(settings: Settings | None = None, *, connect_db: bool = True) -> 
             session_id=session_snap.id,
             patient_id=patient.id,
             department_id=dept_id,
-            subject_role="patient",
+            subject_role="caregiver_respondent" if respondent_type == "caregiver" else "patient",
             actor_id=patient.id,
         )
 

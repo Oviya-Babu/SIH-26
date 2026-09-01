@@ -97,6 +97,8 @@ class Settings(BaseSettings):
     abdm_client_id: str | None = None
     abdm_client_secret: str | None = None
     abdm_consent_manager_id: str = "sbx"
+    abdm_token_path: str = "/v0.5/sessions"
+    abdm_timeout_seconds: float = 10.0
 
     his_adapter_mode: Literal["mock", "live"] = "mock"
     his_base_url: str | None = None

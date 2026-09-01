@@ -13,6 +13,7 @@ from pathlib import Path
 import httpx
 
 from medikiosk.ai.gateway_client import AIGatewayClient
+from medikiosk.modules.abdm import AbdmSandboxClient
 from medikiosk.config import Settings
 from medikiosk.db import Database
 from medikiosk.infrastructure.broker import Broker
@@ -61,6 +62,7 @@ class AppContext:
     thresholds: Thresholds
     content_root: Path
     ai: AIGatewayClient
+    abdm: AbdmSandboxClient
     broker: Broker
     objects: ObjectStore
     transient_store: TransientStore
@@ -161,6 +163,7 @@ class AppContext:
             ),
             content_root=content_root,
             ai=AIGatewayClient(settings, http),
+            abdm=AbdmSandboxClient(settings, http),
             broker=broker,
             objects=objects,
             transient_store=TransientStore(settings.redis_url),
