@@ -69,7 +69,7 @@ def test_asr_transcribe_mock(ai_client):
         wav.setnchannels(1)
         wav.setsampwidth(2)
         wav.setframerate(16000)
-        wav.writeframes(b'\\x00\\x00' * 16000)  # 1 second of silence
+        wav.writeframes(b'\x00\x00' * 16000)  # 1 second of silence
     
     audio_bytes = wav_io.getvalue()
     
@@ -193,7 +193,7 @@ def test_multilingual_asr(ai_client):
         wav.setnchannels(1)
         wav.setsampwidth(2)
         wav.setframerate(16000)
-        wav.writeframes(b'\\x00\\x00' * 16000)
+        wav.writeframes(b'\x00\x00' * 16000)
     
     audio_bytes = wav_io.getvalue()
     
@@ -224,7 +224,7 @@ def test_latency_budget_asr(ai_client):
         wav.setnchannels(1)
         wav.setsampwidth(2)
         wav.setframerate(16000)
-        wav.writeframes(b'\\x00\\x00' * 16000 * 2)  # 2 seconds
+        wav.writeframes(b'\x00\x00' * 16000 * 2)  # 2 seconds
     
     audio_bytes = wav_io.getvalue()
     

@@ -596,12 +596,12 @@
       <div style="max-width: 600px;">
         <div class="input-group">
           <label for="inputPatientName" id="labelFullName">Full Name *</label>
-          <input type="text" id="inputPatientName" class="touch-input" placeholder="e.g. Ramesh Kumar" value="Ramesh Kumar">
+          <input type="text" id="inputPatientName" class="touch-input" placeholder="e.g. Ramesh Kumar">
         </div>
 
         <div class="input-group">
           <label for="inputPhone" id="labelPhone">Phone Number (Optional)</label>
-          <input type="tel" id="inputPhone" class="touch-input" placeholder="Last 4 digits or full number" value="9876543210">
+          <input type="tel" id="inputPhone" class="touch-input" placeholder="Last 4 digits (optional)">
         </div>
       </div>
 
@@ -624,22 +624,29 @@
         <div style="display: flex; gap: 1rem; align-items: flex-start; margin-bottom: 1rem;">
           <span style="font-size: 1.5rem;">🛡️</span>
           <div>
-            <strong>Staff Clinical Access</strong>
-            <p style="font-size: 0.95rem; color: var(--text-muted);">Your treating doctor and nurse will review the answers given at this kiosk.</p>
+            <strong id="consentStaffTitle">Staff Clinical Access</strong>
+            <p id="consentStaffBody" style="font-size: 0.95rem; color: var(--text-muted);">Your treating doctor and nurse will review the answers given at this kiosk.</p>
           </div>
         </div>
         <div style="display: flex; gap: 1rem; align-items: flex-start; margin-bottom: 1rem;">
           <span style="font-size: 1.5rem;">🎙️</span>
           <div>
-            <strong>Voice & Speech Processing</strong>
-            <p style="font-size: 0.95rem; color: var(--text-muted);">Audio is converted to text locally on this server and discarded immediately after transcription.</p>
+            <strong id="consentVoiceTitle">Voice & Speech Processing</strong>
+            <p id="consentVoiceBody" style="font-size: 0.95rem; color: var(--text-muted);">Audio is converted to text locally on this server and discarded immediately after transcription.</p>
           </div>
         </div>
         <div style="display: flex; gap: 1rem; align-items: flex-start;">
           <span style="font-size: 1.5rem;">🔒</span>
           <div>
-            <strong>Digital Personal Data Protection Act (DPDP)</strong>
-            <p style="font-size: 0.95rem; color: var(--text-muted);">Your information is securely encrypted and purpose-limited to this medical encounter.</p>
+            <strong id="consentPrivacyTitle">Privacy & Data Protection</strong>
+            <p id="consentPrivacyBody" style="font-size: 0.95rem; color: var(--text-muted);">Your information is protected by access controls and used for this healthcare encounter.</p>
+          </div>
+        </div>
+        <div style="display: flex; gap: 1rem; align-items: flex-start;">
+          <span style="font-size: 1.5rem;">↔️</span>
+          <div>
+            <strong id="consentAbdmTitle">ABDM Sandbox sharing is separate</strong>
+            <p id="consentAbdmBody" style="font-size: 0.95rem; color: var(--text-muted);">This intake consent does not authorize external sharing. A separate ABDM Consent Manager request is required.</p>
           </div>
         </div>
       </div>
@@ -811,6 +818,14 @@
         idSubtitle: "Enter your name to register for your doctor visit.",
         labelFullName: "Full Name *",
         labelPhone: "Phone Number (Optional)",
+        consentStaffTitle: "Staff Clinical Access",
+        consentStaffBody: "Your treating doctor and nurse will review the answers given at this kiosk.",
+        consentVoiceTitle: "Voice & Speech Processing",
+        consentVoiceBody: "Audio is converted to text locally and discarded immediately after transcription.",
+        consentPrivacyTitle: "Privacy & Data Protection",
+        consentPrivacyBody: "Your information is protected by access controls and used for this healthcare encounter.",
+        consentAbdmTitle: "ABDM Sandbox sharing is separate",
+        consentAbdmBody: "This intake consent does not authorize external sharing. A separate ABDM Consent Manager request is required.",
         consentTitle: "Informed Consent & Privacy",
         consentSubtitle: "We value your privacy. Please review and grant consent for your intake interview.",
         btnConsentAccept: "✓ I Agree & Start Interview",
@@ -831,6 +846,14 @@
         idSubtitle: "डॉक्टर परामर्श के लिए अपना नाम दर्ज करें।",
         labelFullName: "पूरा नाम *",
         labelPhone: "फ़ोन नंबर (वैकल्पिक)",
+        consentStaffTitle: "अधिकृत स्वास्थ्यकर्मी की पहुंच",
+        consentStaffBody: "आपके डॉक्टर और नर्स इस कियोस्क पर दिए गए उत्तर देखेंगे।",
+        consentVoiceTitle: "आवाज़ और भाषण प्रक्रिया",
+        consentVoiceBody: "आवाज़ को स्थानीय रूप से टेक्स्ट में बदला जाएगा और तुरंत हटा दिया जाएगा।",
+        consentPrivacyTitle: "गोपनीयता और डेटा सुरक्षा",
+        consentPrivacyBody: "आपकी जानकारी पहुंच नियंत्रण से सुरक्षित है और इस स्वास्थ्य मुलाकात के लिए उपयोग होगी।",
+        consentAbdmTitle: "ABDM Sandbox साझाकरण अलग है",
+        consentAbdmBody: "यह सहमति बाहरी साझाकरण की अनुमति नहीं देती। ABDM Consent Manager की अलग अनुमति जरूरी है।",
         consentTitle: "सहमति और गोपनीयता",
         consentSubtitle: "हम आपकी गोपनीयता का सम्मान करते हैं। कृपया सेवन साक्षात्कार के लिए सहमति दें।",
         btnConsentAccept: "✓ मैं सहमत हूँ और शुरू करें",
@@ -851,6 +874,14 @@
         idSubtitle: "மருத்துவர் சந்திப்பிற்கு உங்கள் பெயரை உள்ளிடவும்.",
         labelFullName: "முழுப் பெயர் *",
         labelPhone: "தொலைபேசி எண் (விருப்பத்தேர்வு)",
+        consentStaffTitle: "அங்கீகரிக்கப்பட்ட மருத்துவப் பணியாளர் அணுகல்",
+        consentStaffBody: "உங்கள் மருத்துவரும் செவிலியரும் இந்தக் கியோஸ்கில் அளித்த பதில்களைப் பார்ப்பார்கள்.",
+        consentVoiceTitle: "குரல் செயலாக்கம்",
+        consentVoiceBody: "குரல் உள்ளூரில் உரையாக மாற்றப்பட்டு உடனடியாக நீக்கப்படும்.",
+        consentPrivacyTitle: "தனியுரிமை மற்றும் தரவு பாதுகாப்பு",
+        consentPrivacyBody: "உங்கள் தகவல் அணுகல் கட்டுப்பாடுகளால் பாதுகாக்கப்பட்டு இந்த மருத்துவச் சந்திப்புக்குப் பயன்படுத்தப்படும்.",
+        consentAbdmTitle: "ABDM Sandbox பகிர்வு தனியானது",
+        consentAbdmBody: "இந்த ஒப்புதல் வெளிப்புறப் பகிர்வை அனுமதிக்காது. ABDM Consent Manager-ன் தனி அனுமதி தேவை.",
         consentTitle: "ஒப்புதல் & தனியுரிமை",
         consentSubtitle: "உங்கள் விவரங்கள் பாதுகாப்பாக மருத்துவரிடம் பகிரப்படும்.",
         btnConsentAccept: "✓ ஒப்புக்கொண்டு தொடங்கவும்",
@@ -960,7 +991,11 @@
     }
 
     async function startClinicalSession() {
-      const name = document.getElementById('inputPatientName').value.trim() || "Ramesh Kumar";
+      const name = document.getElementById('inputPatientName').value.trim();
+      if (!name) {
+        showToast("Please enter the patient's name");
+        return;
+      }
       const btn = document.getElementById('btnConsentAccept');
       btn.disabled = true;
       btn.innerHTML = "<span>⏳ Starting Session...</span>";
@@ -1191,12 +1226,27 @@
     function playPcmHexAudio(hexString) {
       try {
         const bytes = new Uint8Array(hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
-        const pcm16 = new Int16Array(bytes.buffer);
+        let pcmBytes = bytes;
+        let sampleRate = 16000;
+        if (bytes.length >= 44 && String.fromCharCode(...bytes.slice(0, 4)) === 'RIFF') {
+          const view = new DataView(bytes.buffer);
+          sampleRate = view.getUint32(24, true);
+          let offset = 12;
+          while (offset + 8 <= bytes.length) {
+            const chunkSize = view.getUint32(offset + 4, true);
+            if (String.fromCharCode(...bytes.slice(offset, offset + 4)) === 'data') {
+              pcmBytes = bytes.slice(offset + 8, offset + 8 + chunkSize);
+              break;
+            }
+            offset += 8 + chunkSize;
+          }
+        }
+        const pcm16 = new Int16Array(pcmBytes.buffer, pcmBytes.byteOffset, Math.floor(pcmBytes.byteLength / 2));
         const float32 = new Float32Array(pcm16.length);
         for (let i = 0; i < pcm16.length; i++) float32[i] = pcm16[i] / 32768.0;
 
-        const ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-        const buffer = ctx.createBuffer(1, float32.length, 16000);
+        const ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate });
+        const buffer = ctx.createBuffer(1, float32.length, sampleRate);
         buffer.getChannelData(0).set(float32);
 
         const source = ctx.createBufferSource();
@@ -1467,7 +1517,7 @@
       sessionToken = null;
       currentQuestion = null;
       recordedFacts = [];
-      document.getElementById('inputPatientName').value = "Ramesh Kumar";
+      document.getElementById('inputPatientName').value = "";
       document.getElementById('urgentBanner').style.display = 'none';
       goToStep('stepWelcome');
     }

@@ -150,6 +150,19 @@ class LocalASREngine:
                 audio_duration_seconds=audio_duration,
             )
 
+        # Do not send silence through Whisper. VAD is a gate for ASR, and this
+        # also prevents a quiet kiosk microphone from producing hallucinated text.
+        if float(np.max(np.abs(audio_array))) < 0.01:
+            return ASRResult(
+                transcript="",
+                confidence=0.0,
+                language=language,
+                is_final=is_final,
+                inference_time_ms=round((time.perf_counter() - start) * 1000, 1),
+                model_version=f"faster-whisper-{self.config.model_size}",
+                audio_duration_seconds=round(audio_duration, 2),
+            )
+
         # Map language code
         whisper_lang = LANGUAGE_MAP.get(language, "en")
 

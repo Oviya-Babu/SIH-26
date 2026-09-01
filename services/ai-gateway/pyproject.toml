@@ -24,7 +24,9 @@ dependencies = [
     # Phase 3: Voice (ASR/TTS/VAD)
     "numpy>=1.26.0",  # For audio processing and VAD
     "scipy>=1.12.0",  # Signal processing for noise suppression
-    # Note: webrtcvad, librosa, noisereduce are optional for real deployment
+    "onnxruntime>=1.18.0",  # Silero VAD CPU inference
+    "faster-whisper>=1.1.0",  # Local CTranslate2 ASR
+    "gTTS>=2.5.4",  # Local cache-seeded multilingual TTS
 ]
 
 [project.optional-dependencies]

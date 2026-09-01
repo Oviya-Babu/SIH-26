@@ -21,7 +21,9 @@ export function proxy(request: NextRequest) {
     "font-src 'self'",
     `connect-src 'self' ${apiOrigin} ${oidcOrigin}`,
     "img-src 'self' data:",
-    `style-src 'self' 'nonce-${nonce}'`,
+    // The workspace uses React style props for compact state-specific layout.
+    // Keep scripts nonce-protected while allowing those generated style attrs.
+    "style-src 'self' 'unsafe-inline'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
   ].join("; ");
   requestHeaders.set("Content-Security-Policy", policy);

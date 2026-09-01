@@ -74,6 +74,7 @@ export default function StaffWorkspace() {
   // Admin / Observability State
   const [systemHealth, setSystemHealth] = useState<any>(null);
   const [aiModelsMeta, setAiModelsMeta] = useState<any>(null);
+  const [aiHealth, setAiHealth] = useState<any>(null);
 
   // Status & Notification
   const [statusMsg, setStatusMsg] = useState<string>("System Ready");
@@ -141,12 +142,14 @@ export default function StaffWorkspace() {
   // Load Observability / System Health
   const loadObservability = useCallback(async () => {
     try {
-      const [apiHealth, aiMeta] = await Promise.all([
+      const [apiHealth, aiMeta, gatewayHealth] = await Promise.all([
         fetch(`${apiOrigin}/healthz`).then(r => r.json()).catch(() => ({ status: "unavailable" })),
         fetch(`${aiOrigin}/v1/meta/models`).then(r => r.json()).catch(() => ({ status: "unavailable" })),
+        fetch(`${aiOrigin}/healthz`).then(r => r.json()).catch(() => ({ status: "unavailable" })),
       ]);
       setSystemHealth(apiHealth);
       setAiModelsMeta(aiMeta);
+      setAiHealth(gatewayHealth);
     } catch (e) {
       console.log("Observability fetch error:", e);
     }
@@ -639,19 +642,19 @@ export default function StaffWorkspace() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "1rem", marginBottom: "1.5rem" }}>
               <div style={{ background: "white", padding: "1.25rem", borderRadius: "12px", border: "1px solid var(--border-subtle)" }}>
                 <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 700 }}>API Monolith (:8000)</div>
-                <div style={{ fontSize: "1.3rem", fontWeight: 800, color: "var(--severity-normal)", marginTop: "0.5rem" }}>● HEALTHY</div>
+                <div style={{ fontSize: "1.3rem", fontWeight: 800, color: systemHealth?.status === "ok" ? "var(--severity-normal)" : "var(--severity-critical)", marginTop: "0.5rem" }}>● {systemHealth?.status === "ok" ? "HEALTHY" : "UNAVAILABLE"}</div>
               </div>
               <div style={{ background: "white", padding: "1.25rem", borderRadius: "12px", border: "1px solid var(--border-subtle)" }}>
                 <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 700 }}>AI Gateway (:8100)</div>
-                <div style={{ fontSize: "1.3rem", fontWeight: 800, color: "var(--severity-normal)", marginTop: "0.5rem" }}>● 100% LOCAL</div>
+                <div style={{ fontSize: "1.3rem", fontWeight: 800, color: aiHealth?.status === "ok" ? "var(--severity-normal)" : "var(--severity-critical)", marginTop: "0.5rem" }}>● {aiHealth?.status === "ok" ? "ONLINE" : "UNAVAILABLE"}</div>
               </div>
               <div style={{ background: "white", padding: "1.25rem", borderRadius: "12px", border: "1px solid var(--border-subtle)" }}>
                 <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 700 }}>PostgreSQL RLS</div>
-                <div style={{ fontSize: "1.3rem", fontWeight: 800, color: "var(--severity-normal)", marginTop: "0.5rem" }}>● ISOLATED</div>
+                <div style={{ fontSize: "1.3rem", fontWeight: 800, color: systemHealth?.components?.database?.status === "ok" ? "var(--severity-normal)" : "var(--severity-critical)", marginTop: "0.5rem" }}>● {systemHealth?.components?.database?.status === "ok" ? "ISOLATED" : "STATUS UNKNOWN"}</div>
               </div>
               <div style={{ background: "white", padding: "1.25rem", borderRadius: "12px", border: "1px solid var(--border-subtle)" }}>
                 <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 700 }}>OPA Rego Engine</div>
-                <div style={{ fontSize: "1.3rem", fontWeight: 800, color: "var(--severity-normal)", marginTop: "0.5rem" }}>● ENFORCED</div>
+                <div style={{ fontSize: "1.3rem", fontWeight: 800, color: systemHealth?.components?.opa?.status === "ok" ? "var(--severity-normal)" : "var(--severity-critical)", marginTop: "0.5rem" }}>● {systemHealth?.components?.opa?.status === "ok" ? "ENFORCED" : "STATUS UNKNOWN"}</div>
               </div>
             </div>
 
