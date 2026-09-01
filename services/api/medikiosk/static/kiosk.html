@@ -603,6 +603,19 @@
           <label for="inputPhone" id="labelPhone">Phone Number (Optional)</label>
           <input type="tel" id="inputPhone" class="touch-input" placeholder="Last 4 digits (optional)">
         </div>
+        <div class="input-group" style="margin-top: 1.5rem;">
+          <label id="respondentTitle">Who is answering?</label>
+          <div class="btn-grid" style="grid-template-columns: 1fr 1fr;">
+            <div class="option-card selected" id="respondentPatient" onclick="selectRespondent('patient')"><span class="icon">👤</span><span id="respondentPatientLabel">I am answering for myself</span></div>
+            <div class="option-card" id="respondentCaregiver" onclick="selectRespondent('caregiver')"><span class="icon">🤝</span><span id="respondentCaregiverLabel">Someone is helping me</span></div>
+          </div>
+        </div>
+        <div id="caregiverFields" style="display: none; background: var(--primary-light); border: 1px solid var(--primary-border); border-radius: var(--radius-md); padding: 1rem; margin-top: 1rem;">
+          <p id="caregiverNotice" style="font-size: 0.95rem; color: var(--text-muted); margin-bottom: 1rem;">The patient must acknowledge the helper before the helper answers. This records the helper as the respondent; it does not give them consent authority.</p>
+          <div class="input-group"><label for="inputCaregiverName" id="caregiverNameLabel">Helper's name *</label><input type="text" id="inputCaregiverName" class="touch-input" placeholder="e.g. Ravi Kumar"></div>
+          <div class="input-group"><label for="inputCaregiverRelationship" id="caregiverRelationshipLabel">Relationship *</label><select id="inputCaregiverRelationship" class="touch-input"><option value="spouse">Spouse</option><option value="parent">Parent</option><option value="child">Child</option><option value="sibling">Sibling</option><option value="other_relative">Other relative</option><option value="friend_or_neighbour">Friend or neighbour</option><option value="paid_attendant">Paid attendant</option><option value="legal_guardian">Legal guardian</option></select></div>
+          <label style="display: flex; gap: 0.75rem; align-items: center; font-weight: 700; margin-top: 1rem;"><input type="checkbox" id="caregiverAcknowledged" style="width: 24px; height: 24px;"> <span id="caregiverAckLabel">I am the patient, and I acknowledge this person is helping me.</span></label>
+        </div>
       </div>
 
       <div class="step-footer">
@@ -747,6 +760,14 @@
       <h1 id="reviewTitle">Review Your Recorded Information</h1>
       <p class="step-desc" id="reviewSubtitle">Here is the clinical history recorded for your doctor. Review before submitting.</p>
 
+      <div style="background: var(--primary-light); border: 1px solid var(--primary-border); border-radius: var(--radius-md); padding: 1.25rem; margin-bottom: 1.5rem;">
+        <strong id="documentTitle">Add a medical document</strong>
+        <p id="documentBody" style="font-size: 0.95rem; color: var(--text-muted); margin: 0.35rem 0 1rem;">Take a photo or upload a prescription, report, or other medical document. It will be validated and processed separately.</p>
+        <input type="file" id="documentInput" accept="image/jpeg,image/png,application/pdf" capture="environment" style="display: none;" onchange="uploadKioskDocument(event)">
+        <button class="touch-btn touch-btn-secondary" type="button" onclick="document.getElementById('documentInput').click()"><span id="documentButton">📄 Take photo or choose file</span></button>
+        <div id="documentStatus" style="font-size: 0.9rem; color: var(--text-muted); margin-top: 0.75rem;"></div>
+      </div>
+
       <div class="facts-grid" id="factsListContainer">
         <!-- Rendered clinical facts with provenance -->
       </div>
@@ -793,6 +814,7 @@
     let currentLanguage = 'en';
     let currentDepartmentCode = 'GEN-MED';
     let currentDepartmentName = 'General Medicine';
+    let respondentType = 'patient';
     let sessionId = null;
     let sessionToken = null;
     let currentQuestion = null;
@@ -818,6 +840,16 @@
         idSubtitle: "Enter your name to register for your doctor visit.",
         labelFullName: "Full Name *",
         labelPhone: "Phone Number (Optional)",
+        respondentTitle: "Who is answering?",
+        respondentPatientLabel: "I am answering for myself",
+        respondentCaregiverLabel: "Someone is helping me",
+        caregiverNotice: "The patient must acknowledge the helper before the helper answers. This records the helper as the respondent; it does not give them consent authority.",
+        caregiverNameLabel: "Helper's name *",
+        caregiverRelationshipLabel: "Relationship *",
+        caregiverAckLabel: "I am the patient, and I acknowledge this person is helping me.",
+        documentTitle: "Add a medical document",
+        documentBody: "Take a photo or upload a prescription, report, or other medical document. It will be validated and processed separately.",
+        documentButton: "📄 Take photo or choose file",
         consentStaffTitle: "Staff Clinical Access",
         consentStaffBody: "Your treating doctor and nurse will review the answers given at this kiosk.",
         consentVoiceTitle: "Voice & Speech Processing",
@@ -846,6 +878,16 @@
         idSubtitle: "डॉक्टर परामर्श के लिए अपना नाम दर्ज करें।",
         labelFullName: "पूरा नाम *",
         labelPhone: "फ़ोन नंबर (वैकल्पिक)",
+        respondentTitle: "कौन उत्तर दे रहा है?",
+        respondentPatientLabel: "मैं अपने लिए उत्तर दे रहा/रही हूँ",
+        respondentCaregiverLabel: "कोई मेरी मदद कर रहा है",
+        caregiverNotice: "देखभाल करने वाला उत्तर देने से पहले रोगी को अपनी सहमति देनी होगी। इससे वह उत्तरदाता बनेगा, सहमति देने वाला नहीं।",
+        caregiverNameLabel: "सहायक का नाम *",
+        caregiverRelationshipLabel: "रिश्ता *",
+        caregiverAckLabel: "मैं रोगी हूँ और मैं स्वीकार करता/करती हूँ कि यह व्यक्ति मेरी मदद कर रहा है।",
+        documentTitle: "चिकित्सा दस्तावेज़ जोड़ें",
+        documentBody: "पर्ची, रिपोर्ट या अन्य चिकित्सा दस्तावेज़ की फोटो लें या फ़ाइल चुनें। इसकी अलग से जांच और प्रक्रिया होगी।",
+        documentButton: "📄 फोटो लें या फ़ाइल चुनें",
         consentStaffTitle: "अधिकृत स्वास्थ्यकर्मी की पहुंच",
         consentStaffBody: "आपके डॉक्टर और नर्स इस कियोस्क पर दिए गए उत्तर देखेंगे।",
         consentVoiceTitle: "आवाज़ और भाषण प्रक्रिया",
@@ -976,6 +1018,13 @@
       document.getElementById('headerDept').innerText = `${name} Intake`;
     }
 
+    function selectRespondent(type) {
+      respondentType = type;
+      document.getElementById('respondentPatient').classList.toggle('selected', type === 'patient');
+      document.getElementById('respondentCaregiver').classList.toggle('selected', type === 'caregiver');
+      document.getElementById('caregiverFields').style.display = type === 'caregiver' ? 'block' : 'none';
+    }
+
     function goToStep(stepId) {
       document.querySelectorAll('.step-card').forEach(s => s.classList.remove('active'));
       document.getElementById(stepId).classList.add('active');
@@ -996,6 +1045,13 @@
         showToast("Please enter the patient's name");
         return;
       }
+      if (respondentType === 'caregiver') {
+        const caregiverName = document.getElementById('inputCaregiverName').value.trim();
+        if (!caregiverName || !document.getElementById('caregiverAcknowledged').checked) {
+          showToast("The patient must acknowledge the helper before starting");
+          return;
+        }
+      }
       const btn = document.getElementById('btnConsentAccept');
       btn.disabled = true;
       btn.innerHTML = "<span>⏳ Starting Session...</span>";
@@ -1007,7 +1063,11 @@
           body: JSON.stringify({
             full_name: name,
             language: currentLanguage,
-            department_code: currentDepartmentCode
+            department_code: currentDepartmentCode,
+            respondent_type: respondentType,
+            caregiver_name: respondentType === 'caregiver' ? document.getElementById('inputCaregiverName').value.trim() : null,
+            caregiver_relationship: respondentType === 'caregiver' ? document.getElementById('inputCaregiverRelationship').value : null,
+            caregiver_ack_method: respondentType === 'caregiver' ? 'touch' : null
           })
         });
 
@@ -1481,6 +1541,31 @@
       }
     }
 
+    async function uploadKioskDocument(event) {
+      const file = event.target.files?.[0];
+      if (!file || !sessionId || !sessionToken) return;
+      const status = document.getElementById('documentStatus');
+      status.innerText = 'Uploading and validating document...';
+      const formData = new FormData();
+      formData.append('file', file, file.name);
+      try {
+        const res = await fetch(`${API_BASE}/v1/sessions/${sessionId}/documents`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${sessionToken}` },
+          body: formData
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error?.detail || data?.detail || 'Document upload failed');
+        status.innerText = data.processing_status === 'queued'
+          ? 'Document received. Processing is queued for the clinical team.'
+          : `Document status: ${data.processing_status || 'received'}.`;
+      } catch (error) {
+        status.innerText = `Document could not be uploaded: ${error.message}`;
+      } finally {
+        event.target.value = '';
+      }
+    }
+
     async function finalSessionSubmit() {
       const btn = document.getElementById('btnFinalSubmit');
       btn.disabled = true;
@@ -1516,8 +1601,12 @@
       sessionId = null;
       sessionToken = null;
       currentQuestion = null;
+      respondentType = 'patient';
       recordedFacts = [];
       document.getElementById('inputPatientName').value = "";
+      document.getElementById('inputCaregiverName').value = "";
+      document.getElementById('caregiverAcknowledged').checked = false;
+      selectRespondent('patient');
       document.getElementById('urgentBanner').style.display = 'none';
       goToStep('stepWelcome');
     }

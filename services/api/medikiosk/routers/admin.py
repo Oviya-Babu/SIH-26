@@ -11,6 +11,7 @@ Privileged writes require a step-up MFA assertion on the token (§4).
 from __future__ import annotations
 
 import secrets
+from datetime import datetime
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
@@ -20,6 +21,7 @@ from pydantic import BaseModel, Field as PField
 from medikiosk.deps import Ctx, StaffPrincipal, require
 from medikiosk.errors import Conflict, NotFound
 from medikiosk.modules.audit import service as audit
+from medikiosk.modules.abdm import patient_artifacts, record_artifact_reference, status_payload
 from medikiosk.modules.tenant import service as tenant_service
 from medikiosk.security.opa import ResourceContext
 from medikiosk.security.rbac import Capability
@@ -382,14 +384,10 @@ async def integration_status(
     queue_depths = await ctx.broker.queue_depths()
     ai_health = await ctx.ai.health()
 
+    abdm_status = await ctx.abdm.status()
     return {
         "abdm": {
-            "environment": ctx.settings.abdm_environment,
-            "base_url": ctx.settings.abdm_base_url,
-            "consent_manager_id": ctx.settings.abdm_consent_manager_id,
-            "credentials_configured": bool(ctx.settings.abdm_client_id),
-            "is_production_access": False,
-            "label": "ABDM SANDBOX — no production access is claimed (CLAUDE.md §23)",
+            **status_payload(abdm_status),
         },
         "his": {
             "mode": ctx.settings.his_adapter_mode,
@@ -410,6 +408,61 @@ async def integration_status(
         "broker": {"available": ctx.broker.available, "queue_depths": queue_depths},
         "ai_gateway": ai_health,
     }
+
+
+class AbdmConsentArtifactRequest(BaseModel):
+    patient_id: UUID
+    artifact_id: str = PField(min_length=1, max_length=256)
+    consent_manager_id: str = "sbx"
+    status: Literal["requested", "granted", "denied", "revoked", "expired"]
+    hiu_id: str | None = None
+    granted_at: datetime | None = None
+    expires_at: datetime | None = None
+    raw_artifact: dict[str, Any] = PField(default_factory=dict)
+
+
+@router.post("/integrations/abdm/consent-artifacts")
+async def record_abdm_artifact(
+    ctx: Ctx,
+    payload: AbdmConsentArtifactRequest,
+    principal: StaffPrincipal,
+    authz: Annotated[Any, Depends(require(Capability.INTEGRATION_CONFIG, "record_consent_artifact"))],
+) -> dict[str, Any]:
+    """Record a Consent Manager response; never manufacture one locally."""
+    await authz.check(ResourceContext(type="integration_config", tenant_id=principal.tenant_id))
+    async with ctx.db.transaction(principal) as conn:
+        artifact_ref_id = await record_artifact_reference(
+            conn,
+            principal,
+            patient_id=payload.patient_id,
+            artifact_id=payload.artifact_id,
+            consent_manager_id=payload.consent_manager_id,
+            status=payload.status,
+            hiu_id=payload.hiu_id,
+            granted_at=payload.granted_at,
+            expires_at=payload.expires_at,
+            raw_artifact=payload.raw_artifact,
+        )
+    return {
+        "artifact_ref_id": str(artifact_ref_id),
+        "patient_id": str(payload.patient_id),
+        "environment": "sandbox",
+        "external_consent": payload.status == "granted",
+        "note": "Reference recorded from the configured ABDM Consent Manager; internal MediKiosk consent remains separate.",
+    }
+
+
+@router.get("/integrations/abdm/patients/{patient_id}/consent-artifacts")
+async def list_abdm_artifacts(
+    ctx: Ctx,
+    patient_id: UUID,
+    principal: StaffPrincipal,
+    authz: Annotated[Any, Depends(require(Capability.INTEGRATION_STATUS_READ, "read"))],
+) -> dict[str, Any]:
+    await authz.check(ResourceContext(type="integration_config", tenant_id=principal.tenant_id))
+    async with ctx.db.readonly(principal) as conn:
+        artifacts = await patient_artifacts(conn, principal, patient_id)
+    return {"patient_id": str(patient_id), "environment": "sandbox", "artifacts": artifacts}
 
 
 @router.get("/health-summary")
