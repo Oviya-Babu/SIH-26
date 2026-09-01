@@ -100,14 +100,23 @@ class AppContext:
 
         db = Database(settings)
         if connect_db:
-            await db.connect()
+            try:
+                await db.connect()
+            except Exception as exc:
+                log.warning(
+                    "database_unavailable_at_startup",
+                    component="startup",
+                    error=str(exc),
+                    fallback_engaged=True,
+                )
 
         broker = Broker(settings)
         objects = ObjectStore(settings)
         if connect_db:
-            # Neither is required for startup: §37 requires documents to queue
-            # visibly and clinical workflow to continue when they are down.
-            await broker.connect()
+            try:
+                await broker.connect()
+            except Exception as exc:
+                log.warning("broker_unavailable_at_startup", error=str(exc))
             try:
                 await objects.ensure_bucket()
             except Exception as exc:  # noqa: BLE001

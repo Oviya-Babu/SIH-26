@@ -102,6 +102,7 @@ async def transcribe_voice(
     if principal.session_id != session_id:
         raise Forbidden("token is not scoped to this session", reason_code="forbidden")
 
+    start_time = time.perf_counter()
     try:
         async with ctx.db.readonly(principal) as conn:
             row = await load_session_row(conn, session_id)
@@ -118,11 +119,13 @@ async def transcribe_voice(
             asr_locale=f"{language}-IN",
         )
 
+        elapsed_ms = (time.perf_counter() - start_time) * 1000.0
+
         return VoiceTranscriptionResponse(
             transcript=asr_response.text,
             confidence=asr_response.confidence,
             language=language,
-            inference_time_ms=65.0,
+            inference_time_ms=elapsed_ms,
             is_final=asr_response.is_final,
         )
 
@@ -232,17 +235,36 @@ async def voice_answer(
                 else:
                     raw_value = nlu_response.codes[0]
             elif target_field.value_type == "boolean":
-                raw_value = True
+                lower_t = transcript.lower()
+                if any(w in lower_t for w in ("yes", "haan", "aam", "avunu", "true", "present", "ha", "und")):
+                    raw_value = True
+                elif any(w in lower_t for w in ("no", "nahi", "illai", "kaadhu", "illa", "false", "absent", "na")):
+                    raw_value = False
+                else:
+                    raw_value = transcript
             elif target_field.value_type == "scale":
-                raw_value = 8
+                import re
+                nums = re.findall(r"\b(10|[1-9])\b", transcript)
+                if nums:
+                    raw_value = int(nums[0])
+                else:
+                    raw_value = transcript
             elif target_field.value_type == "duration":
-                raw_value = {"value": 2, "unit": "days"}
+                import re
+                dur_match = re.search(r"(\d+)\s*(day|days|week|weeks|month|months|year|years|hour|hours)", transcript.lower())
+                if dur_match:
+                    raw_value = {"value": int(dur_match.group(1)), "unit": dur_match.group(2)}
+                else:
+                    raw_value = transcript
             elif target_field.options:
-                raw_value = target_field.options[0].value
+                raw_value = nlu_response.codes[0] if nlu_response.codes else transcript
             else:
                 raw_value = transcript
 
-            confidence = max(0.1, min(asr_confidence, nlu_response.confidence) if asr_confidence > 0 else 0.85)
+            if asr_confidence > 0 and nlu_response.confidence > 0:
+                confidence = round(min(asr_confidence, nlu_response.confidence), 3)
+            else:
+                confidence = round(max(asr_confidence, nlu_response.confidence, 0.3), 3)
 
             # Determine verdict
             tau_high = ctx.thresholds.tau_high_placeholder
