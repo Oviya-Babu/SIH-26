@@ -317,11 +317,25 @@ async def alert_stream(websocket: WebSocket) -> None:
         await websocket.close(code=4401)
         return
 
-    try:
-        claims = await ctx.oidc.verify(token)
-    except Exception:  # noqa: BLE001
-        await websocket.close(code=4401)
-        return
+    if token.startswith("dev-") and ctx.settings.is_synthetic_data_environment:
+        import time
+        from medikiosk.security.oidc import StaffClaims
+        claims = StaffClaims(
+            subject="a0000001-0000-4000-8000-000000000001",
+            tenant_id=UUID("11111111-1111-1111-1111-111111111111"),
+            role="nurse",
+            username="nurse.genmed",
+            display_name="Nurse Anitha Raman",
+            mfa_satisfied=True,
+            session_state=None,
+            expires_at=int(time.time()) + 3600,
+        )
+    else:
+        try:
+            claims = await ctx.oidc.verify(token)
+        except Exception:  # noqa: BLE001
+            await websocket.close(code=4401)
+            return
 
     if claims.role not in ("nurse", "physician", "ayush_practitioner"):
         await websocket.close(code=4403)

@@ -58,6 +58,28 @@ async def staff_claims(request: Request, ctx: Ctx) -> StaffClaims:
     if token.startswith("dev-") and ctx.settings.is_synthetic_data_environment:
         import uuid
         import time
+        if "nurse" in token:
+            return StaffClaims(
+                subject="a0000001-0000-4000-8000-000000000001",
+                tenant_id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
+                role="nurse",
+                username="nurse.genmed",
+                display_name="Nurse Anitha Raman",
+                mfa_satisfied=True,
+                session_state=None,
+                expires_at=int(time.time()) + 3600,
+            )
+        if "admin" in token or "it" in token:
+            return StaffClaims(
+                subject="a0000007-0000-4000-8000-000000000007",
+                tenant_id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
+                role="it_admin",
+                username="it.admin",
+                display_name="S Prakash (IT Administrator)",
+                mfa_satisfied=True,
+                session_state=None,
+                expires_at=int(time.time()) + 3600,
+            )
         return StaffClaims(
             subject="a0000003-0000-4000-8000-000000000003",
             tenant_id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
