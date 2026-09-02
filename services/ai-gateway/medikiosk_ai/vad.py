@@ -174,9 +174,12 @@ class SileroVADEngine:
         self._reset_states()
 
         if sample_rate != self.config.sample_rate:
-            raise ValueError(
-                f"Expected sample rate {self.config.sample_rate}, got {sample_rate}"
-            )
+            # Resample instead of crashing — browser mics often produce 44.1/48kHz
+            ratio = self.config.sample_rate / sample_rate
+            new_length = int(len(audio) * ratio)
+            indices = np.linspace(0, len(audio) - 1, new_length)
+            audio = np.interp(indices, np.arange(len(audio)), audio).astype(np.float32)
+            sample_rate = self.config.sample_rate
 
         frame_size = self.config.frame_size
         total_samples = len(audio)

@@ -152,7 +152,8 @@ class LocalASREngine:
 
         # Do not send silence through Whisper. VAD is a gate for ASR, and this
         # also prevents a quiet kiosk microphone from producing hallucinated text.
-        if float(np.max(np.abs(audio_array))) < 0.01:
+        # Threshold lowered to 0.002 to support distant/quiet microphones.
+        if float(np.max(np.abs(audio_array))) < 0.002:
             return ASRResult(
                 transcript="",
                 confidence=0.0,

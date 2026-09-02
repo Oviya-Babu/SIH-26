@@ -280,24 +280,21 @@ async def transcribe(
 
     vad_result = None
     if vad_engine is not None:
-        audio_array = asr_engine._decode_audio(audio_bytes)
-        segments = vad_engine.detect_speech_segments(audio_array)
-        vad_result = {
-            "has_speech": bool(segments),
-            "segment_count": len(segments),
-        }
-        if not segments:
-            return {
-                "text": "",
-                "transcript": "",
-                "confidence": 0.0,
-                "language": lang,
-                "is_final": is_final,
-                "model_version": "silero-vad-no-speech",
-                "inference_time_ms": 0.0,
-                "audio_duration_seconds": len(audio_array) / 16000,
-                "vad": vad_result,
+        try:
+            audio_array = asr_engine._decode_audio(audio_bytes)
+            segments = vad_engine.detect_speech_segments(audio_array)
+            vad_result = {
+                "has_speech": bool(segments),
+                "segment_count": len(segments),
             }
+            if not segments:
+                # VAD is advisory, NOT a hard gate. Whisper has its own VAD
+                # filter and handles real speech that Silero may miss due to
+                # sample-rate edge cases or low-volume distant microphones.
+                logger.info("VAD detected no speech segments; proceeding to ASR anyway")
+        except Exception as vad_err:
+            logger.warning(f"VAD pre-check failed (proceeding to ASR): {vad_err}")
+            vad_result = {"has_speech": True, "segment_count": -1, "error": str(vad_err)}
 
     result = asr_engine.transcribe(audio_bytes, language=lang, is_final=is_final)
 
