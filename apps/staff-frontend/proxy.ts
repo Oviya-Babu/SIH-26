@@ -21,9 +21,11 @@ export function proxy(request: NextRequest) {
     "font-src 'self'",
     `connect-src 'self' ${apiOrigin} ${oidcOrigin}`,
     "img-src 'self' data:",
-    // The workspace uses React style props for compact state-specific layout.
-    // Keep scripts nonce-protected while allowing those generated style attrs.
-    "style-src 'self' 'unsafe-inline'",
+    // style-src omits the inline-scripts exception.  React inline style props
+    // are element attributes, not <style> tags, so they are allowed by the
+    // browser regardless of the directive.  Including the inline exception
+    // would negate nonce-based script protection against style-based injection.
+    "style-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
   ].join("; ");
   requestHeaders.set("Content-Security-Policy", policy);

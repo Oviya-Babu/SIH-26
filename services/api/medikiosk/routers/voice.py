@@ -67,6 +67,8 @@ class VoiceAnswerResponse(BaseModel):
     verdict: str  # accepted | confirm_back | rejected
     completeness: float
     next_field_id: str | None
+    fast_path_engaged: bool = False
+    escalated: bool = False
     inference_time_ms: float
 
 
@@ -302,21 +304,37 @@ async def voice_answer(
                 asr_transcript=transcript,
             )
 
-            total_elapsed_ms = (time.perf_counter() - start_time) * 1000
+            notify = outcome.alert_count > 0 or outcome.escalated
+            department_id = session.department_id
 
-            return VoiceAnswerResponse(
-                session_id=session_id,
-                fact_id=outcome.fact_id,
-                transcript=transcript,
-                field_id=target_field_id,
-                value_raw=str(raw_value),
-                value_normalized={"value": raw_value, "raw": transcript},
-                confidence=confidence,
-                verdict=verdict_str,
-                completeness=outcome.completeness,
-                next_field_id=outcome.next_field_id,
-                inference_time_ms=total_elapsed_ms,
-            )
+        # --- after commit: push red-flag alerts to nurse console ---
+        if notify and department_id is not None:
+            from medikiosk.modules.triage import service as triage_service
+            async with ctx.db.readonly(principal) as conn:
+                await triage_service.notify_new_alerts(
+                    conn,
+                    tenant_id=principal.tenant_id,
+                    session_id=session_id,
+                    department_id=department_id,
+                )
+
+        total_elapsed_ms = (time.perf_counter() - start_time) * 1000
+
+        return VoiceAnswerResponse(
+            session_id=session_id,
+            fact_id=outcome.fact_id,
+            transcript=transcript,
+            field_id=target_field_id,
+            value_raw=str(raw_value),
+            value_normalized={"value": raw_value, "raw": transcript},
+            confidence=confidence,
+            verdict=verdict_str,
+            completeness=outcome.completeness,
+            next_field_id=outcome.next_field_id,
+            fast_path_engaged=outcome.fast_path_engaged,
+            escalated=outcome.escalated,
+            inference_time_ms=total_elapsed_ms,
+        )
 
     except ValidationFailed:
         raise

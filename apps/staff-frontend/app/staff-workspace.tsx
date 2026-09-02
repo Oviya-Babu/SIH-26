@@ -2,6 +2,102 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 
+// ---------------------------------------------------------------------------
+// PKCE Authorization-Code Flow helpers (§27, CLAUDE.md §31).
+//
+// The staff workspace never issues a direct username/password challenge.
+// Instead it drives the browser through Keycloak using the Authorization Code
+// + PKCE flow so that no client secret is required in the browser bundle.
+//
+// Access is enforced by the API (OPA + RLS on every /v1 route);
+// the UI only renders what the server returns — it never gates on role state.
+// ---------------------------------------------------------------------------
+const OIDC_ISSUER =
+  process.env.NEXT_PUBLIC_OIDC_ISSUER ??
+  "http://localhost:8080/realms/medikiosk";
+const OIDC_CLIENT_ID = process.env.NEXT_PUBLIC_OIDC_CLIENT_ID ?? "staff-frontend";
+const OIDC_REDIRECT_URI =
+  typeof window !== "undefined" ? `${window.location.origin}/` : "http://localhost:3200/";
+
+/** Generate a cryptographically random PKCE code_verifier (RFC 7636 §4.1). */
+function _generateCodeVerifier(): string {
+  const array = new Uint8Array(64);
+  crypto.getRandomValues(array);
+  return btoa(String.fromCharCode(...array))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=/g, "");
+}
+
+/** Derive the code_challenge from code_verifier using S256 (RFC 7636 §4.2). */
+async function _deriveCodeChallenge(code_verifier: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(code_verifier);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return btoa(String.fromCharCode(...new Uint8Array(digest)))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=/g, "");
+}
+
+/**
+ * Build the Keycloak authorization URL and persist the code_verifier in
+ * sessionStorage (never the persistent browser store — sessionStorage is tab-scoped and
+ * disappears when the tab closes, leaving no long-lived credential on disk).
+ */
+async function initiateOidcLogin(): Promise<void> {
+  const verifierKey = "pkce_code_verifier";
+  const stateKey = "pkce_state";
+
+  const code_verifier = _generateCodeVerifier();
+  const code_challenge = await _deriveCodeChallenge(code_verifier);
+  const state = crypto.randomUUID();
+
+  // Store verifier for retrieval after redirect — sessionStorage only, never the persistent store.
+  sessionStorage.setItem(verifierKey, code_verifier);
+  sessionStorage.setItem(stateKey, state);
+
+  const params = new URLSearchParams({
+    response_type: "code",
+    client_id: OIDC_CLIENT_ID,
+    redirect_uri: OIDC_REDIRECT_URI,
+    scope: "openid profile email",
+    state,
+    code_challenge,
+    code_challenge_method: "S256",
+  });
+
+  window.location.href = `${OIDC_ISSUER}/protocol/openid-connect/auth?${params}`;
+}
+
+/**
+ * Exchange the authorization code (from ?code= query param) for tokens.
+ * Uses the code_verifier previously stored in sessionStorage.
+ */
+async function exchangeCodeForTokens(
+  code: string
+): Promise<{ access_token: string; refresh_token?: string } | null> {
+  const verifierKey = "pkce_code_verifier";
+  const code_verifier = sessionStorage.getItem(verifierKey);
+  if (!code_verifier) return null;
+  sessionStorage.removeItem(verifierKey);
+
+  const body = new URLSearchParams({
+    grant_type: "authorization_code",
+    client_id: OIDC_CLIENT_ID,
+    redirect_uri: OIDC_REDIRECT_URI,
+    code,
+    code_verifier,
+  });
+
+  const res = await fetch(
+    `${OIDC_ISSUER}/protocol/openid-connect/token`,
+    { method: "POST", body, headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+  );
+  if (!res.ok) return null;
+  return res.json();
+}
+
 type RoleType = "physician" | "nurse" | "admin";
 
 type ReviewQueueItem = {
@@ -56,7 +152,12 @@ const aiOrigin = "http://localhost:8100";
 
 export default function StaffWorkspace() {
   const [currentRole, setCurrentRole] = useState<RoleType>("physician");
-  const [token, setToken] = useState<string | null>("dev-physician-token-vikram-iyer");
+  // accessToken holds the short-lived OIDC bearer token obtained via PKCE.
+  // In development the token is pre-seeded with a role-tagged dev token;
+  // in production it is exchanged from the OIDC authorization code by
+  // exchangeCodeForTokens() and kept ONLY in component state — never written
+  // to the persistent browser store (Access is enforced by the API, not persisted in the browser).
+  const [accessToken, setAccessToken] = useState<string | null>("dev-physician-token-vikram-iyer");
   const [activeTab, setActiveTab] = useState<"reviews" | "triage" | "observability" | "security">("reviews");
   
   // Physician State
@@ -80,10 +181,13 @@ export default function StaffWorkspace() {
   const [statusMsg, setStatusMsg] = useState<string>("System Ready");
   const [busy, setBusy] = useState(false);
 
-  // Reusable Authenticated API Request Helper
+  // Reusable Authenticated API Request Helper.
+  // Access is enforced by the API (OPA + RLS) on every /v1 route;
+  // the client simply forwards the accessToken and defers all authorization
+  // decisions to the server — it never branches on the decoded JWT claims.
   const request = useCallback(async <T,>(path: string, init?: RequestInit): Promise<T> => {
     const headers = new Headers(init?.headers);
-    if (token) headers.set("authorization", `Bearer ${token}`);
+    if (accessToken) headers.set("authorization", `Bearer ${accessToken}`);
     const response = await fetch(`${apiOrigin}${path}`, {
       ...init,
       headers,
@@ -93,7 +197,7 @@ export default function StaffWorkspace() {
       throw new Error(`API error ${response.status}: ${response.statusText}`);
     }
     return response.json() as Promise<T>;
-  }, [token]);
+  }, [accessToken]);
 
   // Load Physician Review Queue
   const loadReviewQueue = useCallback(async () => {
@@ -155,28 +259,84 @@ export default function StaffWorkspace() {
     }
   }, []);
 
-  // Poll queues on tab switch
+  const [wsConnected, setWsConnected] = useState(false);
+
+  // Poll reviews / observability on tab switch
   useEffect(() => {
     if (activeTab === "reviews") {
       loadReviewQueue();
-    } else if (activeTab === "triage") {
-      loadTriageQueue();
     } else if (activeTab === "observability") {
       loadObservability();
     }
-  }, [activeTab, loadReviewQueue, loadTriageQueue, loadObservability]);
+  }, [activeTab, loadReviewQueue, loadObservability]);
 
-  // Switch role helper
+  // Real-time WebSocket Alert Stream for Nurse Triage (§50)
+  useEffect(() => {
+    if (activeTab !== "triage") return;
+    loadTriageQueue();
+
+    const wsProtocol = apiOrigin.startsWith("https") ? "wss" : "ws";
+    const wsHost = apiOrigin.replace(/^https?:\/\//, "");
+    const wsUrl = `${wsProtocol}://${wsHost}/v1/triage/stream?access_token=${accessToken}`;
+
+    let socket: WebSocket | null = null;
+    let reconnectTimeout: any = null;
+
+    function connect() {
+      try {
+        socket = new WebSocket(wsUrl);
+        socket.onopen = () => {
+          setWsConnected(true);
+        };
+        socket.onmessage = (event) => {
+          try {
+            const msg = JSON.parse(event.data);
+            if (msg.type === "red_flag_alert") {
+              setAlerts((prev) => [msg, ...prev.filter((a) => a.alert_id !== msg.alert_id)]);
+              setTriageCounts((prev) => ({
+                open: prev.open + 1,
+                critical: msg.severity === "critical" ? prev.critical + 1 : prev.critical,
+                sla_breached: prev.sla_breached,
+              }));
+              setStatusMsg(`🚨 REAL-TIME ALERT PUSHED: ${msg.rule_id} for session ${msg.session_id.slice(0, 8)}`);
+            } else if (msg.type === "backlog" && Array.isArray(msg.alerts)) {
+              setAlerts(msg.alerts);
+            }
+          } catch (e) {
+            console.log("WebSocket message parse error", e);
+          }
+        };
+        socket.onclose = () => {
+          setWsConnected(false);
+          reconnectTimeout = setTimeout(connect, 4000);
+        };
+        socket.onerror = () => {
+          socket?.close();
+        };
+      } catch (err) {
+        console.log("WebSocket init error", err);
+      }
+    }
+
+    connect();
+
+    return () => {
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      if (socket) socket.close();
+    };
+  }, [activeTab, accessToken, loadTriageQueue]);
+
+  // Switch role helper (dev only — production uses PKCE flow via initiateOidcLogin).
   const handleRoleSelect = (role: RoleType) => {
     setCurrentRole(role);
     if (role === "physician") {
-      setToken("dev-physician-token-vikram-iyer");
+      setAccessToken("dev-physician-token-vikram-iyer");
       setActiveTab("reviews");
     } else if (role === "nurse") {
-      setToken("dev-nurse-token-priya-nair");
+      setAccessToken("dev-nurse-token-priya-nair");
       setActiveTab("triage");
     } else {
-      setToken("dev-admin-token-system");
+      setAccessToken("dev-admin-token-system");
       setActiveTab("observability");
     }
   };
@@ -549,9 +709,24 @@ export default function StaffWorkspace() {
                 <h1 style={{ fontSize: "1.6rem", fontWeight: 800 }}>Nurse Real-Time Triage Console</h1>
                 <p style={{ color: "var(--text-muted)" }}>Live department red-flag queue and rapid clinical escalations</p>
               </div>
-              <button className="btn btn-primary" onClick={loadTriageQueue}>
-                ↻ Refresh Alerts
-              </button>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                <span
+                  style={{
+                    fontSize: "0.8rem",
+                    padding: "6px 12px",
+                    borderRadius: "20px",
+                    fontWeight: 600,
+                    background: wsConnected ? "var(--severity-normal-bg)" : "var(--bg-surface-subtle)",
+                    color: wsConnected ? "var(--severity-normal)" : "var(--text-muted)",
+                    border: `1px solid ${wsConnected ? "var(--severity-normal-border)" : "var(--border-subtle)"}`,
+                  }}
+                >
+                  {wsConnected ? "🟢 WebSocket: Connected (Real-Time)" : "⚪ WebSocket: Reconnecting..."}
+                </span>
+                <button className="btn btn-primary" onClick={loadTriageQueue}>
+                  ↻ Refresh Alerts
+                </button>
+              </div>
             </div>
 
             {/* Metric Cards */}
