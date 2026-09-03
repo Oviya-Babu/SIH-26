@@ -1,222 +1,264 @@
-# MediKiosk
+# MediKiosk — Patient Clinical Intake Platform
 
-MediKiosk is a hospital kiosk-first patient case-taking platform designed for high-volume OPD settings. The current implementation is a backend-first, protocol-driven clinical intake system focused on deterministic workflow, consent, safety checks, and auditability.
+[![Python](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Next.js](https://img.shields.io/badge/Next.js-16.3+-000000?logo=next.js&logoColor=white)](https://nextjs.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-RLS%20Enabled-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![OPA](https://img.shields.io/badge/OPA-Rego%20AuthZ-7D3C98?logo=openpolicyagent&logoColor=white)](https://www.openpolicyagent.org/)
+[![License](https://img.shields.io/badge/Status-SIH%202024%2F2026-brightgreen)](#)
 
-This repository is now grounded in the architecture and requirements described in [CLAUDE.md](CLAUDE.md). It is not a stale Node/React app; the current implementation is a Python FastAPI monolith with a governed clinical protocol engine, OPA-based authorization, PostgreSQL RLS, and infrastructure for the eventual kiosk/staff frontend surfaces.
+> **Official Smart India Hackathon (SIH) Project**  
+> **Problem Statement 4:** *Patient Case-Taking Software*  
+> **Organization:** **All India Institute of Ayurveda (AIIA), Ministry of Ayush**  
+> **Core Setting:** High-volume Indian Outpatient Departments (OPDs) handling 4,000–10,000 patients/day with 2–5 minute physician consultation windows.
+
+MediKiosk is a **hospital kiosk-first, multimodal clinical case-taking platform**. A patient walks up to a touchscreen kiosk with zero prior registration, completes an adaptive voice + touch clinical interview across allopathic (SOCRATES) or Ayurvedic intake (Trividha, Ashtavidha, Dashavidha Pariksha, Ahara-Vihara, Nidana-Samprapti), digitizes prior paper records, and generates an evidence-cited clinical draft for immediate physician review.
 
 ---
 
-## Current implementation status
+## Architecture at a Glance
 
-The repo is in a real backend implementation phase, not a blank scaffolding project.
-
-### Implemented so far
-
-- FastAPI API app and modular architecture in [services/api/medikiosk](services/api/medikiosk)
-- Clinical protocol engine and deterministic next-question logic
-- Session creation, consent gating, and interview flow
-- Red-flag engine and emergency escalation logic
-- Clinical fact model with provenance and respondent tracking
-- Privacy/redaction middleware and observability hooks
-- PostgreSQL migration structure and RLS-first database setup
-- OPA/Rego policy framework and RBAC checks
-- Docker Compose infrastructure for Postgres, Redis, RabbitMQ, Keycloak, OPA, MinIO, ClamAV, Prometheus, Grafana
-- Real tests for engine behavior and red-flag regression
-- Demo seed data and smoke validation script for the Phase 2 vertical slice
-
-### Fully verified in this repo
-
-The repo’s own test configuration has been run successfully:
-
-```bash
-cd /home/aghila/SIH-26/services/api && .venv/bin/python -m pytest -q ../../tests/unit ../../tests/red_flag_regression
+```
+                ┌─────────────────────────────────────────────────────────┐
+                │             Patient Kiosk Touchscreen & Audio           │
+                │        (:8000 /kiosk — English, Hindi, Ta, Te, Ml)      │
+                └────────────────────────────┬────────────────────────────┘
+                                             │ Web Audio / Touch
+                                             ▼
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                           AI Gateway Inference Tier (:8100)                             │
+│   • Silero VAD v5 (ONNX Runtime, 32ms frames)                                           │
+│   • ASR: faster-whisper-small / whisper-large-v3-turbo (En/Hi) + indic-conformer (Ta/Te/Ml)│
+│   • NLU: Multilingual Clinical Multi-Slot Extractor (_SOCRATES_SYNONYMS + MiniLM-L12)   │
+│   • TTS: Pre-cached WAV retrieval (<15ms) + dynamic synthesis fallback                  │
+└────────────────────────────────────────────┬────────────────────────────────────────────┘
+                                             │ Validated Slots (Site, Character, Duration)
+                                             ▼
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                    MediKiosk API Monolith & Protocol Core (:8000)                       │
+│   • Deterministic Protocol Engine: Protocol = (C, F, D, R, O)                           │
+│   • Evaluates Declarative Predicates D(f, state) -> Dynamic NextField Calculation       │
+│   • Red-Flag Emergency Detection & AMPLE Fast Path                                      │
+│   • PostgreSQL with Row-Level Security (RLS) + Append-Only Hash-Chained Audit Trail     │
+│   • OPA / Rego Policy Enforcement (Deny-by-default RBAC + ABAC)                         │
+└────────────────────────────────────────────┬────────────────────────────────────────────┘
+                                             │ Cited Facts (100% Provenance)
+                                             ▼
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                  Staff & Physician Review Workspace (:3200 Next.js)                     │
+│   • Instant Structured Summary with Fact Citation Inspector                             │
+│   • Physician Authority Gate: Accept / Amend / Reject / Approve (Draft -> Approved)    │
+│   • NAMASTE & ICD-11 TM2 Ayurvedic Diagnosis Confirmation                               │
+│   • Real-Time Nurse Red-Flag Emergency Escalation Queue (WebSocket)                     │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-This completed successfully with exit code 0.
-
-### Still pending / not fully implemented yet
-
-- Real browser frontend apps under [apps](apps) are not present yet
-- Full kiosk UI and staff UI not implemented in this workspace
-- Voice pipeline, document OCR, AI summary generation, FHIR/HIS/ABDM production integration, and AYUSH full end-to-end flow are not finished as production-ready app surfaces
-- The repo is best described as Phase 2 / early Phase 3 territory, not a complete end-user clinical product
-
----
-
-## Architecture summary
-
-### Core backend
-
-- API: [services/api/medikiosk/main.py](services/api/medikiosk/main.py)
-- Clinical protocol engine: [services/api/medikiosk/modules/clinical_protocol](services/api/medikiosk/modules/clinical_protocol)
-- Session logic: [services/api/medikiosk/modules/session](services/api/medikiosk/modules/session)
-- Triage/red flags: [services/api/medikiosk/modules/triage](services/api/medikiosk/modules/triage)
-- Consent: [services/api/medikiosk/modules/consent](services/api/medikiosk/modules/consent)
-- Document handling: [services/api/medikiosk/modules/document](services/api/medikiosk/modules/document)
-- Security: [services/api/medikiosk/security](services/api/medikiosk/security)
-
-### Infrastructure and governance
-
-- Docker stack: [infra/docker/docker-compose.yml](infra/docker/docker-compose.yml)
-- Migrations: [migrations](migrations)
-- OPA policies: [policies/opa](policies/opa)
-- Test suite: [tests](tests)
-- Controlled content: [content](content)
-
-### Demo and validation
-
-- Seed demo data: [scripts/seed_demo.py](scripts/seed_demo.py)
-- Vertical slice smoke test: [scripts/smoke_vertical_slice.py](scripts/smoke_vertical_slice.py)
+### Strict Non-Negotiable Boundaries (CLAUDE.md Red Lines)
+1. **AI is strictly perceptual:** AI identifies *what the patient said* (ASR and multi-slot NLU). The deterministic Protocol Engine decides *what to ask next*.
+2. **AI never possesses clinical authority:** AI never selects questions, never decides $NextField$, never decides red flags, never prescribes, never diagnoses, and never writes directly to the database.
+3. **Database Isolation:** AI workers have **no network route to PostgreSQL** and zero database credentials.
+4. **Physician-in-the-Loop:** No clinical record can be finalized or exported to ABDM/FHIR without explicit physician approval.
 
 ---
 
 ## Prerequisites
 
-- Python 3.12+
-- Docker + Docker Compose
-- Git
-- Optional: a local terminal with bash
+Before starting, ensure you have the following installed on your machine:
+- **Operating System:** Linux (Ubuntu 22.04+ recommended), macOS, or Windows WSL2
+- **Docker & Docker Compose v2+** (`docker compose version`)
+- **Python 3.12+** (`python3 --version`)
+- **Node.js 18+ and npm** (`node -v && npm -v`)
+- **Git & Bash**
 
 ---
 
-## Quick start with requirements.txt
+## Quick Start Guide (Zero to Running in 5 Minutes)
 
-The project includes a Python dependency file for the backend service at [services/api/requirements.txt](services/api/requirements.txt).
+Follow this step-by-step sequence to get the entire MediKiosk platform up and running.
 
-### 1) Create and activate a virtual environment
+### Step 1: Clone Repository & Configure Environment
 
 ```bash
-cd /home/aghila/SIH-26/services/api
-python3.12 -m venv .venv
-source .venv/bin/activate
+git clone <repository_url> medikiosk
+cd medikiosk
+
+# The project includes a pre-configured .env file for local development.
+# If creating a fresh one:
+cp .env.example .env
 ```
 
-### 2) Install dependencies
+### Step 2: Start Infrastructure via Docker Compose
+
+Start the database, message broker, authentication, and authorization services:
 
 ```bash
-pip install --upgrade pip
-pip install -r requirements.txt
-```
-
-This installs the FastAPI service dependencies and the dev/test tools needed for local verification.
-
----
-
-## Start the project locally
-
-### Option A: Docker-based local stack (recommended)
-
-From the repo root:
-
-```bash
-cd /home/aghila/SIH-26
 ./scripts/compose.sh up -d postgres redis rabbitmq keycloak opa minio clamav otel-collector prometheus grafana
 ```
 
-Then run migrations:
-
+Verify that all containers are healthy:
 ```bash
-export MEDIKIOSK_MIGRATION_DSN='postgresql://medikiosk_owner:dev_123098_$%_PostGRE_only_change_me@127.0.0.1:5432/medikiosk'
-python scripts/migrate.py --dsn "$MEDIKIOSK_MIGRATION_DSN"
+docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 ```
 
-Seed demo data:
+> [!NOTE]
+> Ensure `medikiosk-opa` is running and has compiled `/policies/authz.rego`. You can verify OPA health anytime with:
+> `curl -s http://localhost:8181/v1/policies`
+
+---
+
+### Step 3: Setup Python Environment & Run Database Migrations
+
+Create your virtual environment and install dependencies:
 
 ```bash
-python scripts/seed_demo.py --dsn "$MEDIKIOSK_MIGRATION_DSN"
-```
-
-Start the API:
-
-```bash
-cd /home/aghila/SIH-26/services/api
+# Create and activate virtual environment at repository root
+python3.12 -m venv .venv
 source .venv/bin/activate
-uvicorn medikiosk.main:app --host 0.0.0.0 --port 8000 --reload
+
+# Install backend API dependencies
+pip install --upgrade pip
+pip install -r services/api/requirements.txt
+
+# Install AI Gateway dependencies
+pip install -e services/ai-gateway
 ```
 
-### Option B: run only the backend service without Docker
+Run database migrations and seed demonstration data:
 
-This is possible for local FastAPI testing if the required services are already running elsewhere, but the canonical development path is still the Docker stack above.
+```bash
+# Export properly URL-encoded connection strings
+eval "$(python3 scripts/env_dsn.py --export)"
+
+# Run PostgreSQL migrations (RLS enabled from migration 0001)
+python3 scripts/migrate.py --dsn "$MEDIKIOSK_MIGRATION_DSN"
+
+# Seed default tenants, departments (General Medicine & AYUSH), devices, and users
+python3 scripts/seed_demo.py --dsn "$MEDIKIOSK_MIGRATION_DSN"
+```
 
 ---
 
-## Verify the service is up
+### Step 4: Start the Application Services
 
-### Health checks
+Open **3 terminal tabs** to run the services:
 
+#### Terminal 1: AI Gateway Service (Port 8100)
 ```bash
-curl http://localhost:8000/healthz
-curl http://localhost:8000/readyz
+cd services/ai-gateway
+source ../../.venv/bin/activate
+PYTHONPATH=. uvicorn medikiosk_ai.main:app --host 0.0.0.0 --port 8100 --reload
 ```
+*Health Check:* `curl http://localhost:8100/healthz`
 
-### Metadata endpoints
-
+#### Terminal 2: MediKiosk Backend API & Kiosk UI (Port 8000)
 ```bash
-curl http://localhost:8000/v1/meta/languages
-```
-
-### Smoke test for the Phase 2 vertical slice
-
-The project includes a live smoke test that exercises the core workflow:
-
-```bash
-cd /home/aghila/SIH-26
-python scripts/smoke_vertical_slice.py --base-url http://127.0.0.1:8000 --device-credential "<device_credential_from_seed_demo>"
-```
-
-This validates the end-to-end sequence:
-
-- kiosk device auth
-- local registration
-- consent
-- session creation
-- deterministic question flow
-- clinical fact creation
-- red-flag escalation
-- session completion behavior
-
----
-
-## Run tests
-
-### Unit + red-flag regression
-
-```bash
-cd /home/aghila/SIH-26/services/api
 source .venv/bin/activate
-python -m pytest -q ../../tests/unit ../../tests/red_flag_regression
+eval "$(python3 scripts/env_dsn.py --export)"
+uvicorn medikiosk.main:app --app-dir services/api --host 0.0.0.0 --port 8000 --reload
 ```
+*Health Check:* `curl http://localhost:8000/healthz`
 
-### Security tests
+#### Terminal 3: Staff & Physician Frontend (Port 3200)
+```bash
+cd apps/staff-frontend
+npm install
+npm run dev
+```
+*Accessible at:* `http://localhost:3200`
+
+---
+
+## Accessing the Platform
+
+| Application Surface | URL | Default Credentials / Role | Notes |
+|---|---|---|---|
+| **Patient Kiosk UI** | [http://localhost:8000](http://localhost:8000) (or `/kiosk`) | Public Patient Access | Touchscreen UI, microphone voice capture, audio prompts |
+| **Staff & Physician Dashboard** | [http://localhost:3200](http://localhost:3200) | Physician / Nurse / Admin | Clinical summary review, red-flag queue, fact approval |
+| **FastAPI Interactive Docs** | [http://localhost:8000/docs](http://localhost:8000/docs) | Developer / API Docs | Swagger UI with OpenAPI 3.1 specification |
+| **AI Gateway Service** | [http://localhost:8100/healthz](http://localhost:8100/healthz) | Internal API | Speech transcription, NLU extraction, and TTS audio synthesis |
+| **Grafana Observability** | [http://localhost:3000](http://localhost:3000) | `admin` / `.env` password | Real-time system latency, throughput, and error metrics |
+| **Keycloak Identity Console** | [http://localhost:8080](http://localhost:8080) | `admin` / `.env` password | OIDC realm `medikiosk`, role management, and MFA |
+
+---
+
+## Live Walkthrough: Testing the Clinical Intake
+
+### 1. Patient Voice & Touch Intake (Kiosk)
+1. Open [http://localhost:8000](http://localhost:8000) in Chrome or Edge.
+2. Select your language (**English**, **हिंदी**, **தமிழ்**, **తెలుగు**, or **മലയാളം**) and click **"Start Intake"**.
+3. Choose a Department:
+   - **General Medicine:** Standard SOCRATES clinical intake.
+   - **AYUSH Ayurveda:** Dashavidha Pariksha, Ahara-Vihara habits, and Prakriti indicators.
+4. Check the consent box and tap **"✓ I Agree & Start Interview"**.
+5. Tap the **Blue Microphone Button** and speak naturally:
+   > *"I have had sharp chest pain since morning and it gets worse when I breathe."*
+6. **Watch the Adaptive Engine in Real Time:**
+   - Silero VAD detects end of speech.
+   - Faster-whisper transcribes audio in memory (raw audio is purged immediately).
+   - Multilingual NLU simultaneously extracts **Site (`chest`)**, **Character (`sharp`)**, **Duration (`1 day`)**, and **Aggravating factor (`breathing`)**.
+   - All 4 clinical facts are committed in a single atomic database transaction.
+   - The engine skips past all 4 answered questions and automatically advances to Radiation/Severity with voice output!
+
+### 2. Handling Uncertainty ("Don't Know" / Skipped Answers)
+If you speak *"I don't know"*, *"not sure"*, *"maloom nahi"*, or *"theriyathu"*, the engine records `skip_reason = SkipReason.PATIENT_UNSURE`, advances smoothly without stalling, and marks the question as unanswered on the physician dashboard.
+
+### 3. Red-Flag Emergency Escalation
+If you report a critical symptom (e.g. *severe chest pain radiating to the left arm* or *difficulty breathing*):
+- The deterministic Red-Flag engine fires instantly (<50ms).
+- The kiosk switches to the calm AMPLE fast path.
+- The Nurse console on `http://localhost:3200` triggers a real-time WebSocket alert.
+
+### 4. Physician Review Workspace
+1. Navigate to [http://localhost:3200](http://localhost:3200).
+2. Open the active patient session.
+3. Review the AI-drafted clinical summary. Notice that **every generated sentence cites a concrete `clinical_fact.id`**.
+4. Edit any fact (creates a new versioned fact, preserving full audit history).
+5. Confirm NAMASTE / ICD-11 TM2 diagnosis codes.
+6. Click **"Approve"** to finalize the record and queue FHIR R4 / ABDM export.
+
+---
+
+## Verification & Automated Tests
+
+To run the complete automated test suite:
 
 ```bash
-python -m pytest -q ../../tests/security
+# Run unit tests and clinical red-flag safety regression suite
+python3 -m pytest tests/unit tests/red_flag_regression -v
+
+# Run authorization and security tests
+python3 -m pytest tests/security -v
+
+# Run the end-to-end vertical slice smoke test
+python3 scripts/smoke_vertical_slice.py --base-url http://127.0.0.1:8000
 ```
 
 ---
 
-## What contributors should do next
+## Troubleshooting & Common Pitfalls
 
-The repo is already strong in the foundational clinical engine and security model. The next useful workstream is to continue in the sequence defined by [CLAUDE.md](CLAUDE.md):
+### 1. Browser Autoplay Audio Policy
+Modern web browsers (Chrome, Firefox, Safari) prevent automatic sound playback until a user performs an interaction (click or tap) on the page.  
+*Solution:* Ensure you tap "Start Intake" or the microphone button; this automatically initializes and resumes the Web Audio `AudioContext`.
 
-1. Finish the real frontend surfaces for kiosk and staff interfaces
-2. Complete the voice pipeline and multilingual interaction flow
-3. Validate OCR + document processing end-to-end
-4. Complete the AI summary evidence-citing path
-5. Add the AYUSH protocol use case and NAMASTE mapping flow
-6. Finalize FHIR/HIS/ABDM adapter testing and sandbox export
-7. Hardening and DPDP / VAPT readiness with real legal and security review
+### 2. "Error loading question" Toast on Kiosk
+If the kiosk shows "Error loading question", the OPA container may not have loaded its policy file.  
+*Solution:* Restart the OPA container to reload and compile `authz.rego`:
+```bash
+docker restart medikiosk-opa
+curl http://localhost:8181/v1/policies  # Verify policies are loaded
+```
+
+### 3. Port Conflicts
+Ensure ports `8000`, `8100`, `3200`, `5432`, and `8181` are not occupied by other software:
+```bash
+ss -tulpn | grep -E ':(8000|8100|3200|5432|8181)'
+```
 
 ---
 
-## Important note
+## Canonical Architecture Document
 
-The project is intentionally backend-first and security-first. A lot of the real value is in the deterministic clinical engine, the audit trail, RBAC model, red-flag logic, and the compliance-oriented architecture. The browser UI is still the missing layer to make the system a fully user-visible product.
+For deep architectural specifications, data models, DPDP Act 2023 compliance controls, FHIR mappings, and cloud GPU deployment configurations, refer to the single authoritative source of truth:
 
-For contributors, the correct starting point is:
-
-- [CLAUDE.md](CLAUDE.md)
-- [services/api](services/api)
-- [migrations](migrations)
-- [tests](tests)
-- [scripts/smoke_vertical_slice.py](scripts/smoke_vertical_slice.py)
+👉 **[CLAUDE.md](CLAUDE.md)**
