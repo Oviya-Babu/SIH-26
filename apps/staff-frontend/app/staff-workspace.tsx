@@ -269,12 +269,23 @@ export default function StaffWorkspace() {
     };
 
     try {
-      const [apiHealth, aiMeta, gatewayHealth] = await Promise.all([
+      const [apiHealth, readyzData, aiMeta, gatewayHealth] = await Promise.all([
         fetch(`${apiOrigin}/healthz`).then(r => r.json()).catch(() => ({ status: "unavailable" })),
+        fetch(`${apiOrigin}/readyz`).then(r => r.json()).catch(() => ({ ready: false, checks: {} })),
         fetchAi("/v1/meta/models"),
         fetchAi("/healthz"),
       ]);
-      setSystemHealth(apiHealth);
+
+      const isDbOk = apiHealth?.components?.database?.status === "ok" || readyzData?.checks?.database?.ok === true;
+      const isOpaOk = apiHealth?.components?.opa?.status === "ok" || readyzData?.checks?.opa?.ok === true;
+
+      setSystemHealth({
+        status: apiHealth?.status === "ok" || readyzData?.ready ? "ok" : "unavailable",
+        components: {
+          database: { status: isDbOk ? "ok" : "unavailable" },
+          opa: { status: isOpaOk ? "ok" : "unavailable" },
+        },
+      });
       setAiModelsMeta(aiMeta);
       setAiHealth(gatewayHealth);
     } catch (e) {
