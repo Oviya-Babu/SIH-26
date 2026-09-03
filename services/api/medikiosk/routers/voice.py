@@ -70,6 +70,7 @@ class VoiceAnswerResponse(BaseModel):
     fast_path_engaged: bool = False
     escalated: bool = False
     inference_time_ms: float
+    slots_extracted: list[str] = PField(default_factory=list)
 
 
 # ============================================================================
@@ -219,64 +220,79 @@ async def voice_answer(
                         reason_code="field_not_found",
                     ) from exc
 
-            # Step 3: NLU — extract structured slot from transcript
-            allowed_codes = tuple(o.value for o in target_field.options) if target_field.options else ()
-            nlu_response = await ctx.ai.fill_slot(
-                transcript=transcript,
-                language=language,
-                concept_code=target_field.concept_code,
-                nlu_slot=target_field.id,
-                allowed_codes=allowed_codes,
-                value_type=str(target_field.value_type),
-            )
+            # Step 3: NLU — Check multi-slot extraction & uncertainty
+            multi_slot = await ctx.ai.extract_all_slots(transcript=transcript, language=language)
+            is_unsure = multi_slot.get("is_unsure", False)
+            extracted_slots = multi_slot.get("slots", {})
+            slots_filled = [target_field_id]
 
-            # Determine value from extracted codes or transcript
-            if allowed_codes and nlu_response.codes:
-                if target_field.value_type in ("multi_select", "body_region"):
-                    raw_value = list(nlu_response.codes)
-                else:
-                    raw_value = nlu_response.codes[0]
-            elif target_field.value_type == "boolean":
-                lower_t = transcript.lower()
-                if any(w in lower_t for w in ("yes", "haan", "aam", "avunu", "true", "present", "ha", "und")):
-                    raw_value = True
-                elif any(w in lower_t for w in ("no", "nahi", "illai", "kaadhu", "illa", "false", "absent", "na")):
-                    raw_value = False
-                else:
-                    raw_value = transcript
-            elif target_field.value_type == "scale":
-                import re
-                nums = re.findall(r"\b(10|[1-9])\b", transcript)
-                if nums:
-                    raw_value = int(nums[0])
-                else:
-                    raw_value = transcript
-            elif target_field.value_type == "duration":
-                import re
-                dur_match = re.search(r"(\d+)\s*(day|days|week|weeks|month|months|year|years|hour|hours)", transcript.lower())
-                if dur_match:
-                    raw_value = {"value": int(dur_match.group(1)), "unit": dur_match.group(2)}
-                else:
-                    raw_value = transcript
-            elif target_field.options:
-                raw_value = nlu_response.codes[0] if nlu_response.codes else transcript
-            else:
-                raw_value = transcript
-
-            if asr_confidence > 0 and nlu_response.confidence > 0:
-                confidence = round(min(asr_confidence, nlu_response.confidence), 3)
-            else:
-                confidence = round(max(asr_confidence, nlu_response.confidence, 0.3), 3)
-
-            # Determine verdict
-            tau_high = ctx.thresholds.tau_high_placeholder
-            tau_low = ctx.thresholds.tau_low_placeholder
-            if confidence >= tau_high:
+            skip_reason = None
+            if is_unsure:
+                # Patient explicitly expressed uncertainty ("I don't know" / "not sure")
+                # Do not trap the patient or reject — record PATIENT_UNSURE gap and advance sensibly (§14.4)
+                skip_reason = engine.SkipReason.PATIENT_UNSURE
+                raw_value = None
+                confidence = 1.0
                 verdict_str = "accepted"
-            elif confidence >= tau_low:
-                verdict_str = "confirm_back"
+            elif target_field_id in extracted_slots:
+                # Matched via rich multilingual clinical concept extraction
+                raw_value = extracted_slots[target_field_id]["value"]
+                confidence = float(extracted_slots[target_field_id].get("confidence", 0.95))
+                verdict_str = "accepted"
             else:
-                verdict_str = "rejected"
+                # Fallback to single-slot NLU endpoint
+                allowed_codes = tuple(o.value for o in target_field.options) if target_field.options else ()
+                nlu_response = await ctx.ai.fill_slot(
+                    transcript=transcript,
+                    language=language,
+                    concept_code=target_field.concept_code,
+                    nlu_slot=target_field.id,
+                    allowed_codes=allowed_codes,
+                    value_type=str(target_field.value_type),
+                )
+
+                if allowed_codes and nlu_response.codes:
+                    if target_field.value_type in ("multi_select", "body_region"):
+                        raw_value = list(nlu_response.codes)
+                    else:
+                        raw_value = nlu_response.codes[0]
+                elif target_field.value_type == "boolean":
+                    lower_t = transcript.lower()
+                    if any(w in lower_t for w in ("yes", "haan", "aam", "avunu", "true", "present", "ha", "und")):
+                        raw_value = True
+                    elif any(w in lower_t for w in ("no", "nahi", "illai", "kaadhu", "illa", "false", "absent", "na")):
+                        raw_value = False
+                    else:
+                        raw_value = transcript
+                elif target_field.value_type == "scale":
+                    import re
+                    nums = re.findall(r"\b(10|[1-9])\b", transcript)
+                    raw_value = int(nums[0]) if nums else transcript
+                elif target_field.value_type == "duration":
+                    import re
+                    dur_match = re.search(r"(\d+)\s*(day|days|week|weeks|month|months|year|years|hour|hours)", transcript.lower())
+                    if dur_match:
+                        raw_value = {"value": int(dur_match.group(1)), "unit": dur_match.group(2)}
+                    else:
+                        raw_value = transcript
+                elif target_field.options:
+                    raw_value = nlu_response.codes[0] if nlu_response.codes else transcript
+                else:
+                    raw_value = transcript
+
+                if asr_confidence > 0 and nlu_response.confidence > 0:
+                    confidence = round(min(asr_confidence, nlu_response.confidence), 3)
+                else:
+                    confidence = round(max(asr_confidence, nlu_response.confidence, 0.3), 3)
+
+                tau_high = ctx.thresholds.tau_high_placeholder
+                tau_low = ctx.thresholds.tau_low_placeholder
+                if confidence >= tau_high:
+                    verdict_str = "accepted"
+                elif confidence >= tau_low:
+                    verdict_str = "confirm_back"
+                else:
+                    verdict_str = "rejected"
 
             respondent_relationship = None
             if session.respondent_type == "caregiver" and session.caregiver_auth_id:
@@ -285,7 +301,7 @@ async def voice_answer(
                 )
                 respondent_relationship = authorization.relationship
 
-            # Step 4: Submit answer in same transaction
+            # Step 4: Submit target field answer
             outcome = await session_service.submit_answer(
                 conn,
                 principal,
@@ -298,11 +314,46 @@ async def voice_answer(
                 input_method="voice",
                 confidence=confidence,
                 confirmed=True,
-                skip_reason=None,
+                skip_reason=skip_reason,
                 respondent_id=principal.actor_id or session.patient_id,
                 respondent_relationship=respondent_relationship,
                 asr_transcript=transcript,
             )
+
+            # Step 5: Multi-slot filling — if patient answered multiple SOCRATES fields
+            # in a single utterance (e.g. "sharp pain in my chest since morning, worse when breathing"),
+            # record all mentioned fields in this same transaction so NextField skips them
+            if not is_unsure and extracted_slots:
+                current_state = await session_service.load_state(conn, session_id)
+                req_fields = set(engine.required_fields(protocol, current_state))
+                answered_so_far = current_state.answered_ids()
+
+                for other_fid, other_data in extracted_slots.items():
+                    if other_fid != target_field_id and other_fid in protocol.fields:
+                        if other_fid in req_fields and other_fid not in answered_so_far:
+                            try:
+                                sub_outcome = await session_service.submit_answer(
+                                    conn,
+                                    principal,
+                                    session=session,
+                                    protocol=protocol,
+                                    ruleset=ctx.ruleset,
+                                    thresholds=ctx.thresholds,
+                                    field_id=other_fid,
+                                    raw_value=other_data["value"],
+                                    input_method="voice",
+                                    confidence=float(other_data.get("confidence", 0.9)),
+                                    confirmed=True,
+                                    skip_reason=None,
+                                    respondent_id=principal.actor_id or session.patient_id,
+                                    respondent_relationship=respondent_relationship,
+                                    asr_transcript=transcript,
+                                )
+                                outcome = sub_outcome
+                                slots_filled.append(other_fid)
+                                answered_so_far = answered_so_far | {other_fid}
+                            except Exception as sub_exc:
+                                log.warning("Multi-slot auxiliary fill skipped for %s: %s", other_fid, sub_exc)
 
             notify = outcome.alert_count > 0 or outcome.escalated
             department_id = session.department_id
@@ -325,8 +376,8 @@ async def voice_answer(
             fact_id=outcome.fact_id,
             transcript=transcript,
             field_id=target_field_id,
-            value_raw=str(raw_value),
-            value_normalized={"value": raw_value, "raw": transcript},
+            value_raw=str(raw_value) if raw_value is not None else "UNSURE",
+            value_normalized={"value": raw_value, "raw": transcript, "slots_filled": slots_filled},
             confidence=confidence,
             verdict=verdict_str,
             completeness=outcome.completeness,
@@ -334,6 +385,7 @@ async def voice_answer(
             fast_path_engaged=outcome.fast_path_engaged,
             escalated=outcome.escalated,
             inference_time_ms=total_elapsed_ms,
+            slots_extracted=slots_filled,
         )
 
     except ValidationFailed:

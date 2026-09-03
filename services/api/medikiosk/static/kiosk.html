@@ -833,6 +833,16 @@
     let captureStartedAt = 0;
     let captureSampleRate = 16000;
 
+    // Web Speech API parallel recognition (browser-native ASR)
+    let webSpeechRecognition = null;
+    let webSpeechTranscript = '';
+    let webSpeechAvailable = false;
+    
+    // Map our language codes to BCP-47 for Web Speech API
+    const SPEECH_LANG_MAP = {
+      en: 'en-IN', hi: 'hi-IN', ta: 'ta-IN', te: 'te-IN', ml: 'ml-IN'
+    };
+
     const API_BASE = window.location.origin;
 
     // Localized Strings for UI
@@ -1311,6 +1321,9 @@
         for (let i = 0; i < pcm16.length; i++) float32[i] = pcm16[i] / 32768.0;
 
         const ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate });
+        if (ctx.state === 'suspended') {
+          ctx.resume().catch(() => {});
+        }
         const buffer = ctx.createBuffer(1, float32.length, sampleRate);
         buffer.getChannelData(0).set(float32);
 
@@ -1323,7 +1336,7 @@
       }
     }
 
-    // Real Microphone Capture & VAD
+    // Real Microphone Capture & VAD + Web Speech API Parallel Recognition
     async function toggleMicrophone() {
       if (isRecording) {
         await stopMicrophone();
@@ -1337,12 +1350,24 @@
       speechDetected = false;
       lastSpeechAt = 0;
       captureStartedAt = performance.now();
+      webSpeechTranscript = '';
 
       try {
-        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+        // Request microphone — let browser pick native sample rate for best quality
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            channelCount: 1,
+          }
+        });
+
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
         await audioContext.resume();
-        captureSampleRate = audioContext.sampleRate;
+        captureSampleRate = audioContext.sampleRate; // Browser's native rate (44100/48000)
+        console.log(`[Voice] Mic opened at ${captureSampleRate}Hz`);
+
         isRecording = true;
         document.getElementById('micBtn').classList.add('recording');
         document.getElementById('micGlow').classList.add('recording');
@@ -1361,15 +1386,17 @@
           let sumSquares = 0;
           for (const sample of chunk) sumSquares += sample * sample;
           const rms = Math.sqrt(sumSquares / chunk.length);
-          if (rms >= 0.005) {
+          if (rms >= 0.003) {
             speechDetected = true;
             lastSpeechAt = performance.now();
-            document.getElementById('micStatus').innerText = "Listening... speech detected";
+            document.getElementById('micStatus').innerText = "🎤 Listening... speech detected";
           }
           pcmChunks.push(chunk);
-          // End naturally after speech followed by silence, while retaining a
-          // manual stop button for patients who pause between words.
-          if (speechDetected && performance.now() - lastSpeechAt > 1200) stopMicrophone();
+          // End naturally after speech followed by 2.5s silence — gives patients
+          // time for natural pauses between words/phrases.
+          if (speechDetected && performance.now() - lastSpeechAt > 2500) stopMicrophone();
+          // Hard cap at 30 seconds to prevent endless recording
+          if (performance.now() - captureStartedAt > 30000) stopMicrophone();
         };
 
         source.connect(audioProcessor);
@@ -1382,6 +1409,9 @@
 
         drawLiveWaveform();
 
+        // Start Web Speech API in parallel for instant browser-native recognition
+        startWebSpeechRecognition();
+
       } catch (err) {
         console.error("Microphone access error:", err);
         showToast("Microphone access was denied. You can touch the buttons below.");
@@ -1392,6 +1422,57 @@
       }
     }
 
+    function startWebSpeechRecognition() {
+      // Start browser-native speech recognition in parallel for best UX
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        console.log('[Voice] Web Speech API not available in this browser');
+        webSpeechAvailable = false;
+        return;
+      }
+      webSpeechAvailable = true;
+      webSpeechRecognition = new SpeechRecognition();
+      webSpeechRecognition.lang = SPEECH_LANG_MAP[currentLanguage] || 'en-IN';
+      webSpeechRecognition.interimResults = true;
+      webSpeechRecognition.continuous = true;
+      webSpeechRecognition.maxAlternatives = 1;
+
+      webSpeechRecognition.onresult = (event) => {
+        let interim = '';
+        let final = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            final += transcript;
+          } else {
+            interim += transcript;
+          }
+        }
+        if (final) {
+          webSpeechTranscript = (webSpeechTranscript + ' ' + final).trim();
+        }
+        // Show live interim transcript to patient for feedback
+        const display = (webSpeechTranscript + ' ' + interim).trim();
+        if (display) {
+          document.getElementById('micStatus').innerText = `🎤 "${display}"`;
+          speechDetected = true;
+          lastSpeechAt = performance.now();
+        }
+      };
+
+      webSpeechRecognition.onerror = (e) => {
+        console.log('[Voice] Web Speech API error:', e.error);
+        // Non-fatal — server ASR is still running
+      };
+
+      try {
+        webSpeechRecognition.start();
+        console.log(`[Voice] Web Speech API started: lang=${webSpeechRecognition.lang}`);
+      } catch (e) {
+        console.log('[Voice] Web Speech API start failed:', e);
+      }
+    }
+
     async function stopMicrophone() {
       if (!isRecording) return;
       isRecording = false;
@@ -1399,6 +1480,11 @@
       document.getElementById('micBtn').classList.remove('recording');
       document.getElementById('micGlow').classList.remove('recording');
       document.getElementById('micStatus').innerText = I18N[currentLanguage]?.micProcessing || "Processing your speech...";
+
+      // Stop Web Speech API
+      if (webSpeechRecognition) {
+        try { webSpeechRecognition.stop(); } catch (e) {}
+      }
 
       if (animationFrameId) cancelAnimationFrame(animationFrameId);
       if (audioProcessor) audioProcessor.disconnect();
@@ -1439,15 +1525,37 @@
       render();
     }
 
+    function resampleTo16k(samples, fromRate) {
+      // Resample audio from browser's native rate (44.1k/48k) to 16kHz for Whisper
+      if (fromRate === 16000) return samples;
+      const ratio = 16000 / fromRate;
+      const newLength = Math.round(samples.length * ratio);
+      const result = new Float32Array(newLength);
+      for (let i = 0; i < newLength; i++) {
+        const srcIdx = i / ratio;
+        const lo = Math.floor(srcIdx);
+        const hi = Math.min(lo + 1, samples.length - 1);
+        const frac = srcIdx - lo;
+        result[i] = samples[lo] * (1 - frac) + samples[hi] * frac;
+      }
+      return result;
+    }
+
     function encodeWavBlob(samplesList, sampleRate = 16000) {
       let totalLength = 0;
       for (const chunk of samplesList) totalLength += chunk.length;
 
-      const flat = new Float32Array(totalLength);
+      let flat = new Float32Array(totalLength);
       let offset = 0;
       for (const chunk of samplesList) {
         flat.set(chunk, offset);
         offset += chunk.length;
+      }
+
+      // Always resample to 16kHz for the ASR engine
+      if (sampleRate !== 16000) {
+        flat = resampleTo16k(flat, sampleRate);
+        sampleRate = 16000;
       }
 
       const buffer = new ArrayBuffer(44 + flat.length * 2);
@@ -1464,8 +1572,8 @@
       view.setUint32(16, 16, true);
       view.setUint16(20, 1, true); // PCM
       view.setUint16(22, 1, true); // Mono
-      view.setUint32(24, sampleRate, true);
-      view.setUint32(28, sampleRate * 2, true);
+      view.setUint32(24, 16000, true); // Always 16kHz
+      view.setUint32(28, 16000 * 2, true);
       view.setUint16(32, 2, true);
       view.setUint16(34, 16, true);
       writeString(view, 36, 'data');
@@ -1487,48 +1595,146 @@
 
       try {
         const targetFieldId = currentQuestion ? currentQuestion.field_id : '';
+        
+        // Try server-side ASR (Whisper)
         const res = await fetch(`${API_BASE}/v1/sessions/${sessionId}/answers/voice?language=${currentLanguage}&field_id=${targetFieldId}`, {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${sessionToken}` },
           body: formData
         });
 
-        if (!res.ok) {
-          showToast("Could not recognize clearly. Please try again or touch an option.");
-          document.getElementById('micStatus').innerText = I18N[currentLanguage]?.micTapToSpeak || "Tap microphone to speak";
+        if (res.ok) {
+          const data = await res.json();
+          handleVoiceResult(data);
           return;
         }
 
-        const data = await res.json();
-        
-        // Show Real Transcript from backend ASR
-        const transcriptBox = document.getElementById('transcriptBox');
-        transcriptBox.style.display = 'block';
-        document.getElementById('transcriptText').innerText = `"${data.transcript}"`;
-        document.getElementById('confidenceTag').innerText = `Confidence: ${(data.confidence * 100).toFixed(0)}% · Verdict: ${data.verdict}`;
+        // Server ASR failed — try Web Speech API transcript as fallback
+        const errorData = await res.json().catch(() => ({}));
+        console.log('[Voice] Server ASR failed:', errorData);
 
-        document.getElementById('micStatus').innerText = "Understood!";
+        if (webSpeechTranscript && webSpeechTranscript.length > 1) {
+          console.log(`[Voice] Falling back to Web Speech API: "${webSpeechTranscript}"`);
+          document.getElementById('micStatus').innerText = `Using browser recognition: "${webSpeechTranscript}"`;
+          
+          // Submit the Web Speech transcript as a text answer
+          const textRes = await fetch(`${API_BASE}/v1/sessions/${sessionId}/answers`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${sessionToken}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              field_id: targetFieldId,
+              raw_value: webSpeechTranscript,
+              input_method: 'voice',
+              confirmed: true
+            })
+          });
 
-        // If confidence verdict is confirm_back, prompt patient to confirm
-        if (data.verdict === 'confirm_back') {
-          document.getElementById('confirmButtons').style.display = 'flex';
-          return;
-        }
+          if (textRes.ok) {
+            const textData = await textRes.json();
+            // Show transcript and advance
+            const transcriptBox = document.getElementById('transcriptBox');
+            transcriptBox.style.display = 'block';
+            document.getElementById('transcriptText').innerText = `"${webSpeechTranscript}"`;
+            document.getElementById('confidenceTag').innerText = `Browser Speech Recognition · Verdict: ${textData.verdict || 'accepted'}`;
+            document.getElementById('micStatus').innerText = "✅ Understood!";
 
-        // Otherwise advance to next question
-        setTimeout(async () => {
-          if (data.next_field_id === null || data.completeness >= 1.0) {
-            await loadConfirmationSummary();
-          } else {
-            await fetchAndRenderNextQuestion();
+            setTimeout(async () => {
+              if (textData.complete || !textData.next_question) {
+                await loadConfirmationSummary();
+              } else {
+                await fetchAndRenderNextQuestion();
+              }
+            }, 1200);
+            return;
           }
-        }, 1200);
+        }
+
+        // Both failed
+        showToast("Could not recognize clearly. Please try again or touch an option.");
+        document.getElementById('micStatus').innerText = "⚠️ Try again — speak clearly or use buttons below";
 
       } catch (err) {
         console.error("Voice submit error:", err);
+        
+        // Last resort: use Web Speech transcript if available
+        if (webSpeechTranscript && webSpeechTranscript.length > 1) {
+          document.getElementById('micStatus').innerText = `Heard: "${webSpeechTranscript}" — retrying...`;
+          // Retry with text submission
+          try {
+            const targetFieldId = currentQuestion ? currentQuestion.field_id : '';
+            const retryRes = await fetch(`${API_BASE}/v1/sessions/${sessionId}/answers`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${sessionToken}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                field_id: targetFieldId,
+                raw_value: webSpeechTranscript,
+                input_method: 'voice',
+                confirmed: true
+              })
+            });
+            if (retryRes.ok) {
+              const retryData = await retryRes.json();
+              document.getElementById('micStatus').innerText = "✅ Understood!";
+              setTimeout(async () => {
+                if (retryData.complete || !retryData.next_question) {
+                  await loadConfirmationSummary();
+                } else {
+                  await fetchAndRenderNextQuestion();
+                }
+              }, 1200);
+              return;
+            }
+          } catch (retryErr) {
+            console.error("Voice retry error:", retryErr);
+          }
+        }
+        
         showToast("Voice connection issue. Please use the touch buttons below.");
         document.getElementById('micStatus').innerText = I18N[currentLanguage]?.micTapToSpeak || "Tap microphone to speak";
       }
+    }
+
+    function handleVoiceResult(data) {
+      // Show Real Transcript from backend ASR
+      const transcriptBox = document.getElementById('transcriptBox');
+      transcriptBox.style.display = 'block';
+      document.getElementById('transcriptText').innerText = `"${data.transcript}"`;
+
+      const numSlots = (data.slots_extracted && data.slots_extracted.length) || 1;
+      let tagText = `Confidence: ${(data.confidence * 100).toFixed(0)}% · Verdict: ${data.verdict}`;
+      if (numSlots > 1) {
+        tagText += ` · Multi-slot (${numSlots} answers captured simultaneously)`;
+      }
+      document.getElementById('confidenceTag').innerText = tagText;
+
+      if (data.value_raw === "UNSURE") {
+        document.getElementById('micStatus').innerText = "ℹ️ Recorded as unsure/don't know — moving forward";
+      } else if (numSlots > 1) {
+        document.getElementById('micStatus').innerText = `✅ Understood! Extracted ${numSlots} clinical answers at once`;
+      } else {
+        document.getElementById('micStatus').innerText = "✅ Understood!";
+      }
+
+      // If confidence verdict is confirm_back, prompt patient to confirm
+      if (data.verdict === 'confirm_back') {
+        document.getElementById('confirmButtons').style.display = 'flex';
+        return;
+      }
+
+      // Otherwise advance to next question
+      setTimeout(async () => {
+        if (data.next_field_id === null || data.completeness >= 1.0) {
+          await loadConfirmationSummary();
+        } else {
+          await fetchAndRenderNextQuestion();
+        }
+      }, 1200);
     }
 
     async function confirmVoiceAnswer(isConfirmed) {

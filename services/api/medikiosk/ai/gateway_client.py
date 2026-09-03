@@ -256,6 +256,25 @@ class AIGatewayClient:
             unmatched_text=body.get("unmatched_text"),
         )
 
+    async def extract_all_slots(
+        self,
+        *,
+        transcript: str,
+        language: str = "en",
+    ) -> dict[str, Any]:
+        """Extract all identifiable SOCRATES slots from one utterance simultaneously."""
+        try:
+            body = await self._post(
+                Component.NLU,
+                "/v1/nlu/extract-all",
+                {"transcript": transcript, "language": language},
+                timeout=self._settings.ai_nlu_timeout_seconds,
+            )
+            return body
+        except Exception as exc:
+            log.warning("extract_all_slots fallback: %s", exc)
+            return {"is_unsure": False, "slots": {}}
+
     # -- TTS ----------------------------------------------------------------
     async def synthesise(
         self, *, text: str, language: str, tts_locale: str, voice: str

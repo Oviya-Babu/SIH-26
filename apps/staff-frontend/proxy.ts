@@ -6,6 +6,9 @@ const apiOrigin = new URL(
 const oidcOrigin = new URL(
   process.env.NEXT_PUBLIC_OIDC_ISSUER ?? "http://localhost:8080/realms/medikiosk",
 ).origin;
+const aiOrigin = new URL(
+  process.env.NEXT_PUBLIC_AI_ORIGIN ?? "http://localhost:8100",
+).origin;
 
 export function proxy(request: NextRequest) {
   const nonce = crypto.randomUUID().replace(/-/g, "");
@@ -19,7 +22,7 @@ export function proxy(request: NextRequest) {
     "frame-ancestors 'none'",
     "object-src 'none'",
     "font-src 'self'",
-    `connect-src 'self' ${apiOrigin} ${oidcOrigin}`,
+    `connect-src 'self' ${apiOrigin} ${oidcOrigin} ${aiOrigin} http://localhost:8100 http://127.0.0.1:8100`,
     "img-src 'self' data:",
     // style-src omits the inline-scripts exception.  React inline style props
     // are element attributes, not <style> tags, so they are allowed by the

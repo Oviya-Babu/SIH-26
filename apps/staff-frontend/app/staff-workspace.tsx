@@ -148,7 +148,7 @@ type TriageAlert = {
 type AuditEvent = { action: string; actor_role: string; occurred_at: string; entity_type: string; entity_id: string };
 
 const apiOrigin = process.env.NEXT_PUBLIC_API_ORIGIN ?? "http://localhost:8000";
-const aiOrigin = "http://localhost:8100";
+const aiOrigin = process.env.NEXT_PUBLIC_AI_ORIGIN ?? "http://localhost:8100";
 
 export default function StaffWorkspace() {
   const [currentRole, setCurrentRole] = useState<RoleType>("physician");
@@ -245,11 +245,34 @@ export default function StaffWorkspace() {
 
   // Load Observability / System Health
   const loadObservability = useCallback(async () => {
+    const fetchAi = async (path: string) => {
+      // 1. Try same-origin Next.js proxy route first (bypasses browser CORS & CSP)
+      try {
+        const res = await fetch(`/api/ai${path}`);
+        if (res.ok) return await res.json();
+      } catch {}
+      // 2. Direct AI Gateway call
+      try {
+        const res = await fetch(`${aiOrigin}${path}`);
+        if (res.ok) return await res.json();
+      } catch {
+        // Fallback to 127.0.0.1 if localhost has IPv6 resolution refusal
+        if (aiOrigin.includes("localhost")) {
+          try {
+            const fallbackUrl = aiOrigin.replace("localhost", "127.0.0.1");
+            const res = await fetch(`${fallbackUrl}${path}`);
+            if (res.ok) return await res.json();
+          } catch {}
+        }
+      }
+      return { status: "unavailable" };
+    };
+
     try {
       const [apiHealth, aiMeta, gatewayHealth] = await Promise.all([
         fetch(`${apiOrigin}/healthz`).then(r => r.json()).catch(() => ({ status: "unavailable" })),
-        fetch(`${aiOrigin}/v1/meta/models`).then(r => r.json()).catch(() => ({ status: "unavailable" })),
-        fetch(`${aiOrigin}/healthz`).then(r => r.json()).catch(() => ({ status: "unavailable" })),
+        fetchAi("/v1/meta/models"),
+        fetchAi("/healthz"),
       ]);
       setSystemHealth(apiHealth);
       setAiModelsMeta(aiMeta);
