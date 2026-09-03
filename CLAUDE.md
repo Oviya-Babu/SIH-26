@@ -52,14 +52,14 @@
 
 | SIH Module / Requirement | MediKiosk Component | Section |
 |---|---|---|
-| Module A: Dual-mode voice + touch | AI Gateway (Silero VAD + faster-whisper + TTS) + Kiosk UI | §10, §18 |
+| Module A: Dual-mode voice + touch | AI Gateway (Silero VAD + whisper-large-v3-turbo / IndicConformer + TTS) + Kiosk UI | §10, §18 |
 | Module A: Adaptive questioning / SOCRATES | Clinical Protocol Engine, data-driven $D(f,\text{state})$ | §10, §11 |
 | Module A: AYUSH Dashavidha / Trividha / Ashtavidha | `ayush_ayurveda_v1` protocol on the same deterministic engine | §12 |
 | Module A: Red-flag emergency detection & fast path | Deterministic Red-Flag Engine + AMPLE fast path | §14 |
-| Module B: Document OCR & digitization | Document Intelligence pipeline (printed + handwritten) | §17 |
+| Module B: Document OCR & digitization | Document Intelligence pipeline (PaddleOCR v4 GPU, printed + handwritten) | §17 |
 | Module B: Medication/lab extraction & abnormal flagging | Entity extraction taxonomy + Lab bounds engine | §15, §17 |
 | Module B: Chronological medical timeline | Timeline module, `provenance_ref` on every fact | §13, §16 |
-| Module C: Physician-ready structured summary | Evidence-Grounded Summary (100% cited facts) | §19 |
+| Module C: Physician-ready structured summary | Evidence-Grounded Summary (Qwen2.5-7B-Instruct vLLM, 100% cited facts) | §19 |
 | Module C: Physician review / edit / approval workspace | Physician Review state machine (Draft→Approved→Exported) | §21 |
 | Module D: Consent & Privacy (DPDP Act 2023) | Internal Consent module, audio-explained, revocable, ephemeral purge | §7, §26 |
 | Module D: ABDM / ABHA ID & FHIR R4 integration | ABHA auth + FHIR R4 Bundle adapters | §22–§25 |
@@ -281,30 +281,40 @@ resolve_protocol(session_request):
 ```
 Department selection at the kiosk drives protocol loading — a governed, versioned lookup, never an LLM decision `[RED LINE]`.
 
-**Where AI is and is not allowed:**
+**Deterministic Architectural Flow — Non-Negotiable Pipeline:**
+```
+Speech → ASR → NLU multi-slot extraction → validated facts → deterministic protocol state → dependency evaluation → NextField → next question
+```
+- **The AI's sole role is perceptual:** The AI identifies **what the patient said** (transcription and structured slot extraction).
+- **The Protocol Engine's sole role is procedural:** The deterministic Clinical Protocol Engine decides **what to ask next** based entirely on $R(\text{state}) \setminus \text{Answered}$ and total ordering $O(f)$.
+- **Adaptive skipping:** If one natural utterance provides Site + Duration + Severity + Character, those fields are immediately populated into validated clinical facts within the same transaction, their corresponding questions are skipped, and the engine dynamically evaluates $NextField$ to identify the next missing required SOCRATES or Dashavidha field.
 
-| Allowed | Never allowed |
+**Where AI is and is not allowed — Explicit RED LINES:**
+
+| Allowed (Perception & Drafting Only) | Never Allowed `[RED LINE]` (Clinical Authority) |
 |---|---|
-| ASR transcription; NLU slot-filling free text into a structured concept; rendering a known question into localized phrasing; suggesting NAMASTE/ICD-11 TM2 candidates; drafting summary prose from structured facts | Deciding which question comes next; deciding whether a red flag fires; deciding lab abnormality; auto-assigning diagnosis codes; writing directly to the clinical record; deciding clinical workflow state |
+| ASR speech-to-text transcription; NLU multi-slot extraction from patient utterances; rendering a known protocol question into localized audio/text phrasing; suggesting ranked candidate NAMASTE / ICD-11 TM2 codes; drafting summary prose from validated clinical facts citing explicit fact IDs | Selecting the next question; deciding `NextField`; evaluating or deciding red flags; diagnosing; prescribing; modifying clinical workflow; directly writing to `clinical_fact` in PostgreSQL; bypassing physician review |
+
+Red flags (§14) and the AMPLE emergency fast path remain 100% deterministic and forward-chaining — never an AI heuristic.
 
 ### 10.1 The 5 Architectural Imperatives for Real Adaptivity (Anti-Script Mandate)
 
 A genuinely adaptive clinical question engine is fundamentally distinct from a branching script or a chatbot. The system adheres to 5 strict architectural mandates:
 
 1. **Principle 1: Explicit Data-Driven Dependency Predicates ($D(f,\text{state})$), Never Hardcoded If-Statements:**
-   Every branching decision, conditional field, and sex/age-restricted question MUST be evaluated via a declarative predicate table in governed protocol JSON (e.g. `op: equals`, `op: in`, `op: age_between`). Hardcoding `if symptom == 'chest_pain' then ask X` scattered across backend routes is strictly forbidden (`[RED LINE]`). All branch logic is verifiable, auditable, and extensible without code recompilation.
+   Every branching decision, conditional field, and sex/age-restricted question MUST be evaluated via a declarative predicate table in governed protocol JSON (e.g. `op: equals`, `op: in`, `op: age_between`). Hardcoding `if symptom == 'chest_pain' then ask X` scattered across backend routes is strictly forbidden (`[RED LINE]`). All branch logic is data-driven, verifiable, auditable, and extensible without code recompilation.
 
 2. **Principle 2: Multi-Slot Filling from a Single Utterance:**
-   Real patients answer multiple SOCRATES fields in a single sentence (e.g. *"sharp pain in my chest since morning, gets worse when I breathe"*). The NLU and voice router evaluate the utterance across the entire active protocol graph, extract multiple slots simultaneously (Site: *chest*, Character: *sharp*, Onset: *1 day*, Aggravating: *breathing*), commit facts for all matched slots within a single database transaction, and advance $NextField$ directly to remaining unanswered gaps. The kiosk NEVER robotically asks *"where is it?"* after the patient has already said *"chest"*.
+   Real patients answer multiple SOCRATES fields in a single natural sentence (e.g. *"sharp pain in my chest since morning, gets worse when I breathe"*). The high-capacity NLU evaluates the utterance across the entire active protocol graph, extracts multiple slots simultaneously (Site: *chest*, Character: *sharp*, Onset/Duration: *1 day*, Aggravating: *breathing*), and commits facts for all matched slots within a single database transaction. $NextField$ dynamically advances directly to the remaining unfilled gaps. The kiosk NEVER robotically asks *"where is it?"* after the patient has already said *"chest"*.
 
 3. **Principle 3: Concurrent Multi-Complaint Tracking:**
-   Patients frequently present with multiple concurrent chief complaints (e.g., chest pain accompanied by headache or fever). The required set $R(\text{state})$ dynamically tracks and interleaves across multiple active symptom subgraphs rather than constraining the patient to a single isolated complaint.
+   Patients frequently present with multiple concurrent chief complaints (e.g., chest pain accompanied by headache or fever). The required set $R(\text{state})$ dynamically tracks and interleaves across multiple active symptom subgraphs simultaneously rather than constraining the patient to a single isolated complaint.
 
 4. **Principle 4: Governed Multilingual Concept Synonym Tables & Code-Switching:**
    Real speech contains rich regional vernacular, colloquialisms, and code-switching (*"mere chest me pain ho raha hai"*, *"nenjula vali"*, *"gundelo noppi"*). Concept mapping relies on first-class, versioned synonym tables (`_SOCRATES_SYNONYMS`) covering English, Hindi, Tamil, Telugu, and Malayalam paired with multilingual sentence embeddings. Concept extraction is invariant to phrasing variations.
 
 5. **Principle 5: Explicit First-Class Handling of Uncertainty ("Don't Know" / Skipped Answers):**
-   When a patient responds with *"I don't know"*, *"not sure"*, *"maloom nahi"*, *"theriyathu"*, or skips a question, the engine must NEVER reject the utterance, stall, or hallucinate an answer. It records an explicit `skip_reason = SkipReason.PATIENT_UNSURE`, preserves completeness metrics, advances to the next question, and surfaces the gap distinctly on the physician review dashboard.
+   When a patient responds with *"I don't know"*, *"not sure"*, *"maloom nahi"*, *"theriyathu"*, or skips a question, the engine must NEVER reject the utterance, stall, or hallucinate an answer. It records an explicit `skip_reason = SkipReason.PATIENT_UNSURE` with `value = None` and `confidence = 1.0`, preserves completeness metrics, advances to the next question, and surfaces the gap distinctly on the physician review dashboard. Uncertainty is never silently converted into an asserted clinical fact `[RED LINE]`.
 
 ---
 
@@ -425,13 +435,14 @@ Unknown-date events go to a separate bucket — **never interpolated** `[RED LIN
 
 ```
 Upload → ack (<500ms) → RabbitMQ job → Image Quality Check (reject blur/glare, re-prompt)
-  → Classification → Preprocessing → OCR/Handwriting → Layout Understanding
+  → Classification → Preprocessing → OCR/Handwriting (PaddleOCR v4 Multilingual GPU) → Layout Understanding
   → Medical Entity Extraction (diagnoses, medications+dosage, investigation values+reference
     ranges, procedure/surgery history)
   → Normalization → Confidence Gate → (low: Human Verification Queue | high: Clinical Fact written)
   → Provenance attached → Timeline updated → Conflict Detection run
 ```
 Both interview-derived and document-derived diagnosis facts route through the identical NAMASTE/ICD-11 TM2 suggestion step (§24) — one code path, not two.
+- **OCR Engine:** `PaddleOCR v4 Multilingual` executed via PaddlePaddle GPU (CUDA) on the Cloud GPU host, processing printed documents and handwritten prescriptions/notes asynchronously without blocking the interactive kiosk loop.
 
 ### 17.3 Storage & purge
 
@@ -447,42 +458,94 @@ Both interview-derived and document-derived diagnosis facts route through the id
 
 ## 18. AI Gateway Architecture
 
-**Isolation, structural not conventional:** AI workers (ASR/NLU/OCR/TTS/LLM) have **no network route to PostgreSQL** — enforced at the network/firewall layer `[RED LINE]`. They receive a request, return a response. Only the application layer writes to the database.
+**Isolation, structural not conventional:** AI workers and cloud GPU hosts (ASR/NLU/OCR/TTS/LLM) have **no network route to PostgreSQL** — enforced at the network/firewall layer `[RED LINE]`. They receive an inference payload, return a response. Only the application layer writes to the database.
 
-### 18.1 Architecture Change Record: 100% Self-Hosted / Local AI Transition
+### 18.1 Architecture Change Record: Cloud GPU AI Architecture (NVIDIA RTX 4090 24GB VRAM)
 
 > [!NOTE]
-> **ARCHITECTURE CHANGE RECORD (2026-08-31)**
-> - **Previous Architecture:** Managed Bhashini / Cloud API endpoints via HTTP.
-> - **New Architecture:** 100% Self-Hosted, Local, Edge/Offline-Capable AI Stack running on CPU (ONNX Runtime + CTranslate2 INT8).
-> - **Driver:** Eliminates cloud API latency, vendor lock-in, external billing dependencies, and enables true offline clinical kiosk deployment in remote OPDs.
-> - **Preserved Invariants:** AI Gateway remains strictly isolated (no database access, no route to PostgreSQL). All deterministic clinical logic, confidence gating, red-flag escalation, and physician review authority remain 100% unchanged `[RED LINE §10, §20]`.
+> **ARCHITECTURE CHANGE RECORD (2026-09-03)**
+> - **Previous Architecture:** 100% Local CPU-based models (INT8 quantized faster-whisper-small, Tesseract, CPU embeddings).
+> - **New Architecture:** High-Throughput Cloud GPU AI Stack powered by an NVIDIA GeForce RTX 4090 (Ada Lovelace, 24 GB GDDR6X VRAM), provisioned via cloud GPU host (currently Vast.ai for ~20 hours during the SIH hackathon; architected to be completely cloud/provider-neutral).
+> - **Driver:** Upgrading from resource-constrained CPU inference to dedicated 24 GB GPU inference to maximize practical clinical accuracy, acoustic robustness in noisy OPD hospital environments, zero-shot first-pass understanding, multi-slot extraction from natural patient utterances, and low-latency multilingual support across all 5 mandatory languages (English, Hindi, Tamil, Telugu, Malayalam), Indian accents, and colloquial code-switching.
+> - **Preserved Invariants:** The cloud GPU is strictly for **stateless AI inference only**. AI services have **no PostgreSQL network route, no database credentials, and no ORM models** `[RED LINE §10, §20]`. All deterministic clinical logic, confidence gating, red-flag escalation, dependency predicates ($D(f,\text{state})$), and physician review authority remain 100% unchanged `[RED LINE §10, §21]`.
+> - **Provider Neutrality:** While Vast.ai is the active provider for the hackathon deployment, the infrastructure is provider-agnostic. The application layer communicates with the AI tier via standard containerized HTTP/mTLS endpoints (`AI_GATEWAY_URL`, `LLM_SERVICE_URL`), allowing seamless migration to RunPod, Lambda Labs, AWS EC2, GCP, or on-premise hospital GPU servers.
 
-**100% Self-Hosted AI Pipeline Components & Exact Parameters:**
-- **VAD (Voice Activity Detection):**
-  - *Model:* Silero VAD v5 (`models/vad/silero_vad.onnx`) running via ONNX Runtime CPU (`intra_op_num_threads=2`).
-  - *Parameters:* Sample rate 16,000 Hz, detection threshold `0.5`, chunk size `512` samples (32ms windows), `min_speech_duration_ms=100`, `min_silence_duration_ms=300`.
-- **ASR (Automated Speech Recognition):**
-  - *Model:* `Systran/faster-whisper-small` (CTranslate2 INT8 quantized execution).
-  - *Parameters:* `device="cpu"`, `cpu_threads=4`, `beam_size=1` (greedy search for lowest latency), `condition_on_previous_text=False`, `language` dynamically set to patient selection (`en`, `hi`, `ta`, `te`, `ml`). In-memory 16kHz 16-bit mono WAV input.
-- **Clinical NLU & Multi-Slot Engine:**
-  - *Architecture:* Governed clinical synonym tables (`_SOCRATES_SYNONYMS`) covering 5 languages + code-switching ("mera chest me pain hai"), regex pattern extractors for durations/numbers, uncertainty detector (`_UNSURE_PHRASES`), and semantic embedding similarity (`sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`).
-  - *Multi-Slot Capability:* Simultaneously extracts Chief Complaint, Site, Character, Onset/Duration, Severity, Aggravating, and Relieving factors from a single utterance, submitting all matched slots in a single atomic database transaction.
-- **TTS (Text-to-Speech):**
-  - *Architecture:* Dual-layer synthesis. Layer 1: Disk-cached pre-rendered PCM16 WAV files (`models/tts_cache`) for all standard protocol prompts in 5 languages (latency < 10ms). Layer 2: On-demand local synthesis + browser Web Speech API (`window.speechSynthesis`) fallback.
-- **OCR (Optical Character Recognition):**
-  - *Model:* Tesseract / ONNX pipeline for printed prescriptions and lab reports; asynchronous execution via background worker queue.
+**Cloud GPU AI Stack & Target 24 GB VRAM Allocation:**
 
-`[CONTROL]` **The privacy rule that must never be skipped:**
-All audio processing occurs entirely in-memory within the local AI Gateway worker and is purged immediately after transcription. No voice data is ever transmitted to external cloud providers.
+| Component | Model | Engine / Runtime | Target VRAM (24 GB Total) | Target Latency (p95) | Role & Optimization Target |
+|---|---|---|---|---|---|
+| **VAD** | Silero VAD v5 | ONNX Runtime | ~0.1 GB (or CPU thread) | < 50 ms | Voice activity detection, tuned for high-ambient OPD noise, 512-sample chunking |
+| **English & Hindi ASR** | `openai/whisper-large-v3-turbo` | faster-whisper / CTranslate2 FP16 (CUDA) | ~3.5 – 4.5 GB | < 450 ms (bound < 800 ms) | High-accuracy transcription for English, Hindi, and Hinglish code-switching; beam_size=1 greedy decoding |
+| **Tamil, Telugu & Malayalam ASR** | `ai4bharat/indic-conformer-600m` | PyTorch / ONNX (CUDA) | ~2.5 – 3.5 GB | < 500 ms (bound < 800 ms) | State-of-the-art Indic ASR specialized for Dravidian languages, regional accents, and colloquial speech |
+| **Clinical NLU & Multi-Slot** | `paraphrase-multilingual-MiniLM-L12-v2` + governed `_SOCRATES_SYNONYMS` | Sentence-Transformers (CUDA) + Compiled Regex/Synonyms | ~1.2 – 1.8 GB | < 20 ms | High-speed semantic matching, multi-slot parallel extraction, and explicit uncertainty detection |
+| **Multilingual OCR** | `PaddleOCR v4 Multilingual` | PaddlePaddle GPU (CUDA) | ~2.5 – 3.5 GB | < 1.5 s / page (bound < 2 min / doc) | Text detection & recognition for printed and handwritten prescriptions, lab reports, discharge summaries |
+| **Clinical Summary & Coding** | `Qwen/Qwen2.5-7B-Instruct` | vLLM (AWQ INT4, port `:8101`) | ~5.5 – 6.5 GB | < 4.0 s (bound < 8 s) | Evidence-grounded clinical draft generation with strict fact-citation schemas; NAMASTE / ICD-11 TM2 candidate ranking |
+| **VRAM Headroom / KV Cache** | — | PyTorch / CUDA Runtime | ~4.0 – 5.0 GB | — | Dynamic batching headroom, vLLM PagedAttention KV cache, and image buffer allocations |
+| **Total** | **Integrated GPU Stack** | **Single 24 GB RTX 4090** | **~20 – 22 GB Active / 24 GB Max** | **Total Interactive Turnaround < 1.2 s** | **High-accuracy, low-latency concurrent multimodal clinical intake** |
 
-### 18.2 Ports, Browser Audio Lifecycle, & Low-Latency Execution
+*Engineering Note on Benchmarks:* Model latency and VRAM numbers are **engineering targets/estimates until benchmarked on the provisioned RTX 4090**. Final numbers will be empirically recorded during hackathon testing; no synthetic or unverified benchmarks are presented as measured fact.
 
-| Service | Port | Role & Interaction Pattern |
-|---|---|---|
-| **Kiosk Web Application** | `:8000` (`/` or `/kiosk`) | Patient-facing touchscreen UI. Manages microphone capture via Web Audio API, encodes 16kHz WAV, plays TTS question audio, and renders interactive buttons. |
-| **Staff & Physician Frontend** | `:3200` | Physician review workspace, nurse red-flag queue, and admin management console. |
-| **AI Gateway Service** | `:8100` | Headless, isolated microservice exposing `/v1/asr/transcribe`, `/v1/nlu/slot-fill`, `/v1/nlu/extract-all`, and `/v1/tts/synthesize`. Has NO UI; direct browser navigation returns service health JSON. |
+### 18.2 Accuracy, Reliability, and Multilingual Robustness Requirements
+
+1. **Noisy Hospital / OPD Acoustic Environments:**
+   Indian hospital OPDs frequently experience background crowds, tannoy announcements, and ambient chatter. The pipeline enforces:
+   - Hardware requirement for directional noise-cancelling microphones on kiosk hardware (§8).
+   - Silero VAD v5 dual-threshold filtering to isolate active patient speech.
+   - Spectral noise suppression applied before ASR processing, preventing ambient hospital noise from generating phantom speech tokens.
+
+2. **Indian Multilingual Speech & Accents:**
+   To guarantee high acoustic and semantic accuracy across diverse patient demographics:
+   - `whisper-large-v3-turbo` handles English, Hindi, and North Indian phonetic variations.
+   - `indic-conformer-600m` (AI4Bharat) is specifically utilized for South Indian languages (Tamil, Telugu, Malayalam), drastically reducing Word Error Rate (WER) compared to general models.
+
+3. **Code-Switching & Non-Technical Colloquial Speech:**
+   Real patients rarely use textbook clinical terminology; they code-switch dynamically (*"mere chest me pain ho raha hai"*, *"nenjula bharama irukku"*, *"gundelo manta"*).
+   - The NLU layer combines multilingual sentence embeddings with a versioned, governed synonym lookup table (`_SOCRATES_SYNONYMS`).
+   - Resolves colloquial phrasing (e.g., *chhati me dard*, *seene me jalan*, *sir dard*, *pet me marod*, *saas lene me takleef*) directly to canonical clinical concepts without requiring the patient to adopt formal medical vocabulary.
+
+4. **First-Pass Patient Understanding:**
+   High-capacity GPU models eliminate the repetitive "Could you repeat that?" frustration common with lightweight edge models. The system is designed to extract valid clinical facts from the patient's very first natural description.
+
+5. **Confidence Gating & Clarification Flow:**
+   Every extracted slot receives a joint ASR/NLU confidence score $\kappa(v) \in [0, 1]$:
+   - $\kappa(v) \ge \tau_{high}(f) \implies$ **Accept:** Fact committed to session state.
+   - $\tau_{low}(f) \le \kappa(v) < \tau_{high}(f) \implies$ **Confirm-Back:** Kiosk confirms with the patient in their language (*"Did you say sharp pain in the chest?"*) with simple Yes/No touch confirmation.
+   - $\kappa(v) < \tau_{low}(f) \implies$ **Reject / Re-prompt:** Fallback prompt with touch options displayed on screen.
+   - `[RED LINE]` **Never silently convert uncertain AI output into a clinical fact.** An unconfident extraction must never bypass patient confirmation or touch validation.
+
+6. **Explicit First-Class Handling of Uncertainty ("Don't Know" / Skipped Answers):**
+   When a patient responds with *"I don't know"*, *"not sure"*, *"maloom nahi"*, *"theriyathu"*, or taps "Skip", the engine must NEVER reject the utterance or hallucinate a clinical value. It records an explicit `skip_reason = SkipReason.PATIENT_UNSURE` with `value = None` and `confidence = 1.0`, preserves completeness calculations, advances to the next question, and surfaces the gap distinctly on the physician review dashboard (§10.1).
+
+### 18.3 Adaptive Questioning — Architectural Invariant
+
+The relationship between Cloud GPU AI and the deterministic engine is absolute and non-negotiable:
+
+```
+Speech → ASR → NLU multi-slot extraction → validated facts → deterministic protocol state → dependency evaluation → NextField → next question
+```
+
+- **The AI identifies what the patient said:** ASR transcribes; NLU maps words onto structured clinical concepts.
+- **The deterministic Clinical Protocol Engine decides what to ask next:** `NextField` is $\text{argmin}_{f \in R(\text{state}) \setminus \text{Answered}} O(f)$, calculated purely from declarative protocol JSON rules.
+- **Multi-Slot Acceleration:** When a patient provides multiple clinical parameters in a single utterance (*"sharp pain in my chest since morning, gets worse when I breathe"*), the AI extracts Site (`chest`), Character (`sharp`), Onset (`1 day`), and Aggravating (`breathing`). All four are committed as validated facts in a single transaction, their questions are marked answered, and the engine dynamically identifies the next unfilled required field (e.g. Radiation or Severity).
+
+`[RED LINE]` **AI must NEVER:**
+- Select the next question;
+- Decide `NextField`;
+- Decide red flags;
+- Diagnose;
+- Prescribe;
+- Change clinical workflow;
+- Directly write to `clinical_fact` in PostgreSQL;
+- Bypass physician review.
+
+### 18.4 Ports, Browser Audio Lifecycle, & Network Boundaries
+
+| Service | Port | Host / Network Zone | Role & Interaction Pattern |
+|---|---|---|---|
+| **Kiosk Web Application** | `:8000` (`/` or `/kiosk`) | App VM / Client | Patient-facing touchscreen UI. Manages microphone capture via Web Audio API, encodes 16kHz WAV, plays TTS question audio, and renders interactive buttons. |
+| **Staff & Physician Frontend** | `:3200` | App VM | Physician review workspace, nurse red-flag queue, and admin management console. |
+| **AI Gateway Service** | `:8100` | Cloud GPU Host | Headless, isolated microservice exposing `/v1/asr/transcribe`, `/v1/nlu/slot-fill`, `/v1/nlu/extract-all`, `/v1/tts/synthesize`, and `/v1/ocr/extract`. No UI; returns structured JSON. |
+| **LLM Summary Service** | `:8101` | Cloud GPU Host | High-throughput vLLM OpenAI-compatible server hosting `Qwen/Qwen2.5-7B-Instruct` AWQ INT4 for evidence-grounded summary generation and NAMASTE candidate ranking. |
 
 **Browser Autoplay Policy & Audio Prerequisites:**
 Modern browsers (Chrome/Firefox/Safari) enforce a strict autoplay security policy: audio cannot play via `AudioContext` or `speechSynthesis` until the user interacts with the webpage (clicks or taps).
@@ -491,32 +554,37 @@ Modern browsers (Chrome/Firefox/Safari) enforce a strict autoplay security polic
 3. Voice activity or silence threshold (rms < 0.003 for 2.5s) stops recording and dispatches the WAV payload to `/v1/sessions/{id}/answers/voice`.
 4. The response returns the next question ID and auto-triggers `speakQuestionTTS` for immediate audible response.
 
-### 18.3 Noisy-environment ASR
+`[CONTROL]` **The privacy rule that must never be skipped:**
+The Cloud GPU host runs self-hosted, private containerized AI workers. All audio and document processing occurs entirely in-memory within these dedicated inference containers and is purged immediately after processing. Audio data is transmitted only over encrypted TLS 1.3 between the App backend and the dedicated GPU host, and is never logged, stored, or sent to third-party commercial consumer AI APIs.
+
+### 18.5 Noisy-environment ASR Pipeline
 
 ```
-Microphone input → Voice Activity Detection, tuned for OPD ambient noise
+Microphone input → Voice Activity Detection (Silero VAD v5), tuned for OPD ambient noise
   → Noise suppression (applied before ASR, not after)
-  → Streaming ASR — partial hypotheses emitted continuously
+  → Dual-Engine Streaming ASR (Whisper Large Turbo for En/Hi, Indic-Conformer for Ta/Te/Ml)
   → Confidence-scored transcript → Clinical NLU (Multi-Slot Extraction)
-  → Persistently low confidence → automatic fallback to touch/text, patient notified in-language
+  → Confidence Gating (accept / confirm-back / touch fallback)
 ```
-Directional/noise-cancelling mic hardware is a stated kiosk procurement requirement (§8), not left implicit.
 
-### 18.4 Model Latency Budget (Target: <1.5s Total Turnaround)
+### 18.6 Model Latency Budget (Target: <1.5s Total Turnaround)
 
-| Component | Target Latency | Optimization Strategy |
-|---|---|---|
-| VAD Pre-check | < 50ms | Silero ONNX CPU int8, 512-sample chunking |
-| ASR Transcription | 300–700ms | faster-whisper-small INT8, beam_size=1, 4 threads |
-| NLU Multi-Slot Extraction | < 20ms | Governed compiled synonym hash table + regex |
-| State Recomputation & NextField | < 15ms | In-memory total ordering scan over $R(\text{state})$ |
-| TTS Audio Retrieval / Playback | < 20ms | Pre-cached disk WAV for question prompts |
-| **Total Round-Trip Time** | **< 1.2s** | **Fully local edge execution on standard hospital hardware** |
+| Component | Target Latency on RTX 4090 | Hard Bound (p95) | Optimization Strategy |
+|---|---|---|---|
+| VAD Pre-check | < 30 ms | < 50 ms | Silero ONNX, 512-sample chunking |
+| ASR Transcription | ~350 – 500 ms | < 800 ms | `whisper-large-v3-turbo` FP16 / `indic-conformer-600m` GPU, beam_size=1 |
+| NLU Multi-Slot Extraction | < 15 ms | < 20 ms | Governed compiled synonym hash table + multilingual embeddings |
+| State Recomputation & NextField | < 10 ms | < 20 ms | In-memory total ordering scan over $R(\text{state})$ |
+| TTS Audio Retrieval / Playback | < 15 ms | < 50 ms | Pre-cached disk WAV for question prompts |
+| **Total Round-Trip Time** | **~600 – 900 ms** | **< 1.5 s p95** | **Cloud GPU inference with fast network transport** |
+| Document OCR / Extraction | ~1.5 s / page | < 2 min / doc | `PaddleOCR v4 Multilingual` GPU async pipeline |
+| Clinical Summary Generation | ~3.0 – 4.5 s | < 8 s p95 | `Qwen/Qwen2.5-7B-Instruct` vLLM AWQ INT4 (:8101) |
 
 ---
 
 ## 19. Evidence-Grounded LLM Summary & AI Guardrails
 
+- **Model & Execution Stack:** `Qwen/Qwen2.5-7B-Instruct` served via vLLM (AWQ INT4 quantized) on dedicated port `:8101` of the Cloud GPU host. Provides high-throughput, low-latency token generation (~3.0–4.5s) for clinical summary drafting and NAMASTE / ICD-11 TM2 candidate ranking.
 - **Input:** structured Clinical Facts only — never raw patient transcript fed directly for "creative" summarization.
 - **Output:** schema-validated (Pydantic); **every generated sentence must cite a real `clinical_fact.id`** — a sentence without a citation is rejected by the generation contract, not just discouraged by prompting `[RED LINE]`.
 - **No autonomous diagnosis, no direct database writes, no workflow authority.**
@@ -529,8 +597,14 @@ Directional/noise-cancelling mic hardware is a stated kiosk procurement requirem
 ## 20. AI Isolation — No Direct Database Access
 
 Enforced at two layers, not one:
-1. **Network/firewall:** AI Gateway containers have no route to the PostgreSQL port `[CONTROL]`.
-2. **Code:** AI Gateway code has no DB client, no connection string, no ORM model — writes only ever happen via the Clinical Facts module's own API, called by the orchestrating backend after validating AI output `[CONTROL]`.
+1. **Network/firewall:** The Cloud GPU host (Vast.ai or equivalent) and AI Gateway containers have **no network route to the PostgreSQL port**, no database connection string, and no access to the internal data tier `[CONTROL]`.
+2. **Code:** AI Gateway and LLM code have no DB client, no connection string, no ORM model — writes only ever happen via the Clinical Facts module's own API, called by the orchestrating backend after validating AI output `[CONTROL]`.
+3. **Mandatory Validation Pipeline:** All AI inference output must strictly traverse:
+   ```
+   AI Inference (Cloud GPU) → App Layer Schema Validation → OPA Policy Gate →
+     Clinical Business Rules → Joint Confidence Gating (κ ≥ τ_high) →
+     Clinical Fact Transaction (PostgreSQL RLS) → Hash-Chained Audit Trail
+   ```
 
 Tested explicitly: a CI/deploy hook fails the build if any AI Gateway container config includes a PostgreSQL connection string or credential (§61).
 
@@ -708,7 +782,7 @@ Covered in §19. Additional: rate limiting on AI-cost-bearing endpoints to preve
 | Failure | Behavior |
 |---|---|
 | Internet down at kiosk | Session continues on cached protocol state; answers queued encrypted locally; idempotent sync on reconnect |
-| ASR/OCR/LLM service down | Circuit breaker trips → automatic fallback to touch/text (ASR), documents queue visibly (OCR), structured-facts-only view (LLM) — physician never blocked |
+| Cloud GPU / AI service unreachable (network drop or instance timeout) | Circuit breaker trips → automatic fallback to touch/text (ASR), documents queue visibly (OCR), structured-facts-only view (LLM) — physician never blocked |
 | ABDM/HIS sandbox unreachable | Approval still completes locally; export queues in the outbox, retried; nothing blocks physician workflow |
 
 **No patient data is ever lost; no downstream failure blocks clinical care** `[RED LINE]`.
@@ -728,7 +802,7 @@ Covered in §19. Additional: rate limiting on AI-cost-bearing endpoints to preve
 
 ## 39. Observability
 
-OpenTelemetry + Prometheus + Grafana, PHI-redacted at the collector (§28). SLOs tied to latency budgets (§54). Golden-signal dashboards per service; GPU utilization/queue depth for AI workers; alerting on SLO breach, dead-letter-queue growth, red-flag SLA timeout, auth anomalies.
+OpenTelemetry + Prometheus + Grafana, PHI-redacted at the collector (§28). SLOs tied to latency budgets (§54). Golden-signal dashboards per service; GPU observability: NVIDIA SMI exporter / Prometheus metrics monitoring RTX 4090 VRAM allocation, GPU compute utilization %, temperature, inference queue depth, and batch latency; alerting on SLO breach, dead-letter-queue growth, red-flag SLA timeout, auth anomalies.
 
 ---
 
@@ -750,7 +824,7 @@ Scheduled `pg_dump`/WAL archiving, encrypted, access-controlled separately from 
 flowchart TB
     subgraph TF["Terraform-provisioned infrastructure, from day one"]
         VM1["App VM"]
-        VM2["GPU Inference Host"]
+        VM2["Cloud GPU Host (RTX 4090 24GB - Vast.ai / Provider-Neutral)"]
         Net["Networking/Firewall/DNS"]
         Sec["Secrets Store"]
         DB["Managed/Secured PostgreSQL"]
@@ -767,7 +841,8 @@ flowchart TB
 ```
 
 - **Terraform provisions infrastructure from day one** — VMs, networking, secrets store, managed database and object storage where used. `[CONTROL]` This is not deferred to "later"; it is designed in from Phase 0.
-- **Docker Compose deploys the application layer** onto that provisioned infrastructure — one app VM + one GPU host, no cluster overhead.
+- **Docker Compose deploys the application layer** onto that provisioned infrastructure — one app VM + one Cloud GPU host, no cluster overhead.
+- **Cloud GPU Host (Inference Only):** An NVIDIA GeForce RTX 4090 (24 GB VRAM) provisioned via Vast.ai for the ~20 hours of the SIH hackathon. Architected to be cloud/provider-neutral: the App VM connects to the GPU inference host via standard containerized endpoints (`AI_GATEWAY_URL`, `LLM_SERVICE_URL`). The GPU host has **no access to PostgreSQL, no DB credentials, and no persistent patient storage** `[RED LINE]`.
 - **Kubernetes is `[FUTURE]`**, adopted only once real multi-tenant load proves the need for independent API/GPU/worker autoscaling — not adopted preemptively to look enterprise-grade `[RED LINE — no premature infra]`.
 - **Kafka is `[FUTURE]`**, adopted only if RabbitMQ's throughput/ordering genuinely becomes insufficient.
 - Domain contracts (bounded-context APIs, event schemas, outbox pattern) are designed so this migration changes infrastructure, not the domain model.
@@ -904,6 +979,7 @@ Per-language, per-noise-condition ASR WER gate before enabling voice in that lan
 | Physician dashboard load | <1s p95 |
 
 The patient never waits on an unrelated async pipeline — document processing, notifications, and integration export are fully decoupled from the interactive loop.
+*Target Estimates vs. Hard Bounds:* On the NVIDIA RTX 4090 GPU, expected typical latencies are substantially faster (ASR final ~350–500ms, Summary ~3.0–4.5s), but the conservative p95 latency bounds (<800ms, <8s) remain the official non-negotiable thresholds. All numbers represent engineering targets until formally benchmarked on the provisioned GPU host; no benchmark results are fabricated.
 
 ---
 
@@ -920,7 +996,7 @@ Dev/staging use synthetic data only (§28). No production PHI ever reaches a non
 
 ## 56. Required External Services / API Credentials
 
-Bhashini/AI4Bharat API access (ecosystem partner registration) · Google Cloud project **with billing enabled** (§18.1) · ABDM sandbox `CLIENT_ID`/`CLIENT_SECRET` (developer registration) · no key needed for self-hosted Keycloak/OPA.
+Cloud GPU host instance (Vast.ai or equivalent NVIDIA RTX 4090 host; endpoint configured via `AI_GATEWAY_URL` and `LLM_SERVICE_URL`) · Hugging Face / model weights access for open-weight models (`openai/whisper-large-v3-turbo`, `ai4bharat/indic-conformer-600m`, `Qwen/Qwen2.5-7B-Instruct`, `PaddleOCR v4`) · ABDM sandbox `CLIENT_ID`/`CLIENT_SECRET` (developer registration) · no key needed for self-hosted Keycloak/OPA.
 
 ---
 
@@ -944,15 +1020,15 @@ Wire Phase 1's engine to real Session/Consent/Identity from Phase 0. Add Red-Fla
 **DoD:** this slice runs end-to-end against the real deployed backend, with a real red-flag rule firing and correct provenance on every fact. **This is the single most important milestone in the build** — everything after is enrichment of a proven core.
 
 ### Phase 3 — Voice
-ASR/NLU wired into Phase 2's live interactive loop; VAD/noise suppression; latency instrumentation against the §54 budget for real.
+ASR (`whisper-large-v3-turbo` + `indic-conformer-600m`) and Clinical NLU wired into Phase 2's live interactive loop on Cloud GPU host; Silero VAD / noise suppression; latency instrumentation against the §54 budget for real.
 **DoD:** a real spoken conversation completes an interview within budget; killing the ASR container mid-session degrades to touch/text without losing state.
 
 ### Phase 4 — Documents + QR
-Upload endpoint, RabbitMQ + outbox, QR-to-phone flow (§9), OCR pipeline (printed documents first, handwriting deferred), confidence-gated human verification queue.
+Upload endpoint, RabbitMQ + outbox, QR-to-phone flow (§9), OCR pipeline (`PaddleOCR v4 Multilingual` GPU; printed documents first, handwriting deferred), confidence-gated human verification queue.
 **DoD:** a scanned printed prescription becomes a provenance-linked Clinical Fact end-to-end asynchronously, without blocking the patient session.
 
 ### Phase 5 — Evidence-Grounded AI Summary
-Summary Generation Service, bounded/timed LLM call, citation-required schema, patient-facing confirmation checkpoint.
+Summary Generation Service (`Qwen/Qwen2.5-7B-Instruct` on vLLM AWQ INT4, port `:8101`), bounded/timed LLM call, citation-required schema, patient-facing confirmation checkpoint.
 **DoD:** killing the LLM service mid-flow still leaves a fully usable structured-facts-and-timeline view for the physician.
 
 ### Phase 6 — AYUSH
