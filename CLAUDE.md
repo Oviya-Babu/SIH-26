@@ -25,9 +25,21 @@
 
 ## 1. Product Vision & Exact SIH Scope
 
-**Problem:** Indian OPDs give physicians 2–5 minutes per patient — insufficient for proper history-taking, prior-document review, examination, diagnosis, and prescription. AYUSH settings need an even deeper history (Dashavidha Pariksha) than allopathic intake. Existing tools don't solve this: registration kiosks capture only demographics, mobile apps exclude the elderly/rural/low-literacy population, manual triage doesn't scale, generic scanners don't structure clinical content.
+**Official SIH Problem Statement:**
+- **Problem Statement 4:** *Patient Case-Taking Software*
+- **Organization (Ministry/Department):** **All India Institute of Ayurveda (AIIA), Ministry of Ayush**
+- **Theme:** Medtech / Biotech / Healthtech | **Category:** Software
+- **Core Setting:** High-volume Indian Outpatient Departments (OPDs) handling 4,000–10,000 patients/day where doctors have only 2–5 minutes per patient.
 
-**Product:** MediKiosk is a **hospital kiosk-first** patient case-taking platform. A patient walks up to a fixed touchscreen tablet with zero prior enrollment, completes a comprehensive voice+touch clinical history (General Medicine or AYUSH), digitizes prior documents, and the physician opens a complete, evidence-cited, editable draft the moment the patient enters the room.
+**Problem:** Indian OPDs give physicians 2–5 minutes per patient — insufficient for proper history-taking, prior-document review, examination, diagnosis, and prescription. AYUSH institutions (specifically All India Institute of Ayurveda) face an even deeper challenge: Ayurvedic history taking requires comprehensive assessment across Trividha, Ashtavidha, and Dashavidha Pariksha (Prakriti, Vikriti, Agni, Koshtha), Ahara-Vihara (diet/lifestyle), Nidana (causative factors), and Samprapti (pathogenesis) — a far more extensive framework than allopathic intake. Existing tools fail: registration kiosks capture only basic demographics, mobile apps exclude low-literacy/rural/elderly patients, manual triage does not scale, and generic document scanners fail to structure clinical data.
+
+**Product:** MediKiosk is a **hospital kiosk-first** patient case-taking platform. A patient walks up to a fixed touchscreen tablet with zero prior enrollment, completes a comprehensive voice+touch clinical history (General Medicine or AYUSH Ayurveda), digitizes prior documents, and the physician opens a complete, evidence-cited, editable draft the moment the patient enters the consultation room.
+
+**The Four Mandatory Core Modules:**
+1. **Module A — Conversational Multimodal History Engine:** Dual-mode voice + touch, adaptive questioning (SOCRATES + Dashavidha Pariksha), code-switching, and red-flag emergency detection.
+2. **Module B — Medical Document Digitization & Intelligence:** OCR of printed and handwritten prescriptions, lab reports, discharge summaries; chronological timeline; abnormal-value flagging.
+3. **Module C — Structured History Summary Generator:** Instant physician-ready bilingual draft citing clinical facts with full physician accept/amend/reject authority.
+4. **Module D — Consent, Privacy, & ABDM Integration:** DPDP Act 2023 compliance, ABHA ID auth, ephemeral kiosk session purge, and FHIR R4 push.
 
 **Explicit scope boundary — do not expand beyond this:**
 - The product **runs on a hospital-provisioned Android touchscreen tablet**. The tablet is a client; it is **not** the backend and does **not** contain the clinical database (§8).
@@ -38,27 +50,23 @@
 
 ## 2. SIH Requirement → MediKiosk Feature Mapping
 
-| SIH Requirement | MediKiosk Component | Section |
+| SIH Module / Requirement | MediKiosk Component | Section |
 |---|---|---|
-| Patient identification/registration | Patient & Identity module, ABHA-first | §7 |
-| Multilingual voice + touch | AI Gateway (ASR/TTS) + dual-mode Question Engine | §10, §18 |
-| Adaptive questioning / SOCRATES | Clinical Protocol Engine, `NextField` | §10, §11 |
-| Complete history (PMH/PSH/drug/allergy/family/personal/ROS) | `general_medicine_v1` protocol data | §11 |
-| AYUSH / Dashavidha Pariksha / Ahara-Vihara | `ayush_ayurveda_v1` protocol data, same engine | §12 |
-| Red-flag detection | Red-Flag Engine, deterministic | §14 |
-| Document capture (printed + handwritten, multilingual) | Document Intelligence pipeline | §17 |
-| Medication/dosage, investigation values, procedure history extraction | Entity extraction taxonomy | §17 |
-| Abnormal-value detection, drug interactions | Deterministic conflict/lab engines | §15 |
-| Chronological timeline, provenance | Timeline module, `provenance_ref` on every fact | §13, §16 |
-| Physician-ready summary | Evidence-Grounded Summary | §19 |
-| Physician review/edit/approval | Physician Review state machine | §21 |
-| Consent, revocable, audio-explained | Internal Consent module | §7 |
-| ABDM/HIS/FHIR integration | Adapters, `[MOCK/SANDBOX]` | §22–§25 |
-| NAMASTE/ICD-11 TM2 | AYUSH Terminology module | §24 |
-| Privacy/security | §26–§36 | |
-| Multi-tenancy | Tenant module + RLS | §30 |
+| Module A: Dual-mode voice + touch | AI Gateway (Silero VAD + faster-whisper + TTS) + Kiosk UI | §10, §18 |
+| Module A: Adaptive questioning / SOCRATES | Clinical Protocol Engine, data-driven $D(f,\text{state})$ | §10, §11 |
+| Module A: AYUSH Dashavidha / Trividha / Ashtavidha | `ayush_ayurveda_v1` protocol on the same deterministic engine | §12 |
+| Module A: Red-flag emergency detection & fast path | Deterministic Red-Flag Engine + AMPLE fast path | §14 |
+| Module B: Document OCR & digitization | Document Intelligence pipeline (printed + handwritten) | §17 |
+| Module B: Medication/lab extraction & abnormal flagging | Entity extraction taxonomy + Lab bounds engine | §15, §17 |
+| Module B: Chronological medical timeline | Timeline module, `provenance_ref` on every fact | §13, §16 |
+| Module C: Physician-ready structured summary | Evidence-Grounded Summary (100% cited facts) | §19 |
+| Module C: Physician review / edit / approval workspace | Physician Review state machine (Draft→Approved→Exported) | §21 |
+| Module D: Consent & Privacy (DPDP Act 2023) | Internal Consent module, audio-explained, revocable, ephemeral purge | §7, §26 |
+| Module D: ABDM / ABHA ID & FHIR R4 integration | ABHA auth + FHIR R4 Bundle adapters | §22–§25 |
+| AYUSH Dual Coding: NAMASTE + ICD-11 TM2 | AYUSH Terminology module | §24 |
+| Hospital Multi-Tenancy & Data Isolation | Tenant module + PostgreSQL Row-Level Security (RLS) | §30 |
 
-Every requirement in the original PS traces to a component above. None is left as a vague future feature.
+Every requirement in the official AIIA/Ayush problem statement traces directly to a component above. None is left as a vague future feature.
 
 ---
 
@@ -279,6 +287,25 @@ Department selection at the kiosk drives protocol loading — a governed, versio
 |---|---|
 | ASR transcription; NLU slot-filling free text into a structured concept; rendering a known question into localized phrasing; suggesting NAMASTE/ICD-11 TM2 candidates; drafting summary prose from structured facts | Deciding which question comes next; deciding whether a red flag fires; deciding lab abnormality; auto-assigning diagnosis codes; writing directly to the clinical record; deciding clinical workflow state |
 
+### 10.1 The 5 Architectural Imperatives for Real Adaptivity (Anti-Script Mandate)
+
+A genuinely adaptive clinical question engine is fundamentally distinct from a branching script or a chatbot. The system adheres to 5 strict architectural mandates:
+
+1. **Principle 1: Explicit Data-Driven Dependency Predicates ($D(f,\text{state})$), Never Hardcoded If-Statements:**
+   Every branching decision, conditional field, and sex/age-restricted question MUST be evaluated via a declarative predicate table in governed protocol JSON (e.g. `op: equals`, `op: in`, `op: age_between`). Hardcoding `if symptom == 'chest_pain' then ask X` scattered across backend routes is strictly forbidden (`[RED LINE]`). All branch logic is verifiable, auditable, and extensible without code recompilation.
+
+2. **Principle 2: Multi-Slot Filling from a Single Utterance:**
+   Real patients answer multiple SOCRATES fields in a single sentence (e.g. *"sharp pain in my chest since morning, gets worse when I breathe"*). The NLU and voice router evaluate the utterance across the entire active protocol graph, extract multiple slots simultaneously (Site: *chest*, Character: *sharp*, Onset: *1 day*, Aggravating: *breathing*), commit facts for all matched slots within a single database transaction, and advance $NextField$ directly to remaining unanswered gaps. The kiosk NEVER robotically asks *"where is it?"* after the patient has already said *"chest"*.
+
+3. **Principle 3: Concurrent Multi-Complaint Tracking:**
+   Patients frequently present with multiple concurrent chief complaints (e.g., chest pain accompanied by headache or fever). The required set $R(\text{state})$ dynamically tracks and interleaves across multiple active symptom subgraphs rather than constraining the patient to a single isolated complaint.
+
+4. **Principle 4: Governed Multilingual Concept Synonym Tables & Code-Switching:**
+   Real speech contains rich regional vernacular, colloquialisms, and code-switching (*"mere chest me pain ho raha hai"*, *"nenjula vali"*, *"gundelo noppi"*). Concept mapping relies on first-class, versioned synonym tables (`_SOCRATES_SYNONYMS`) covering English, Hindi, Tamil, Telugu, and Malayalam paired with multilingual sentence embeddings. Concept extraction is invariant to phrasing variations.
+
+5. **Principle 5: Explicit First-Class Handling of Uncertainty ("Don't Know" / Skipped Answers):**
+   When a patient responds with *"I don't know"*, *"not sure"*, *"maloom nahi"*, *"theriyathu"*, or skips a question, the engine must NEVER reject the utterance, stall, or hallucinate an answer. It records an explicit `skip_reason = SkipReason.PATIENT_UNSURE`, preserves completeness metrics, advances to the next question, and surfaces the gap distinctly on the physician review dashboard.
+
 ---
 
 ## 11. General Medicine Protocol (`general_medicine_v1`)
@@ -290,13 +317,28 @@ Department selection at the kiosk drives protocol loading — a governed, versio
 
 ---
 
-## 12. AYUSH Protocol (`ayush_ayurveda_v1`) — Dashavidha Pariksha
+## 12. AYUSH Protocol (`ayush_ayurveda_v1`) — Comprehensive Ayurvedic Case-Taking
 
-Activated when `department.protocol_family == 'ayush_ayurveda'`. Same engine, extended `C`/`F`:
+Activated when `department.protocol_family == 'ayush_ayurveda'`. Evaluated on the **exact same deterministic engine binary** as General Medicine with co-equal core priority (All India Institute of Ayurveda mandate):
 
-- **Dashavidha Pariksha:** Prakriti, Vikriti, Sara, Samhanana, Pramana, Satmya, Sattva, Ahara Shakti, Vyayama Shakti, Vaya.
-- **Ahara-Vihara** (diet/lifestyle assessment), **Nidana** (causative factors), **Samprapti** (pathogenesis) — included where clinically defined by the AYUSH Governance reviewers.
-- **Diagnosis coding:** dual-coded NAMASTE + ICD-11 TM2 (§24), for both interview-derived and document-derived facts.
+- **Trividha Pariksha (Threefold Assessment):**
+  - *Darshana* (Inspection) & *Sparshana* (Palpation): Recorded during physical examination by the practitioner.
+  - *Prashna* (Interrogation / History): Structured patient case-taking executed via the MediKiosk voice+touch dual-mode engine.
+- **Ashtavidha Pariksha (Eightfold Clinical Assessment):**
+  - Kiosk collects patient-reportable baseline parameters: *Mutra* (urine characteristics, frequency, burning), *Mala* (bowel habits, consistency, Agni/Koshtha indicators), *Nidra* (sleep quality/timing), and *Jihva/Swara* subjective symptoms.
+  - Objective components (*Nadi, Drik, Akriti*) are reserved for physician entry during physical review.
+- **Dashavidha Pariksha (Tenfold Clinical Assessment):**
+  - *Prakriti* (constitution indicators: Vata, Pitta, Kapha physical & mental traits).
+  - *Vikriti* (current doshic imbalance and vitiation).
+  - *Sara* (tissue excellence), *Samhanana* (compactness/body build), *Pramana* (anthropometry).
+  - *Satmya* (homologation / habituation), *Sattva* (mental stamina / temperament).
+  - *Ahara Shakti* (Abhyavaharana & Jarana Shakti — intake & digestive capacity).
+  - *Vyayama Shakti* (physical endurance / capacity for work), *Vaya* (age / life-stage).
+- **Ahara-Vihara (Diet & Lifestyle Assessment):**
+  - *Ahara:* Rasa preferences (Shadrasa), eating frequency, timing, water intake (*Jala Pana*), Viruddhahara (incompatible foods).
+  - *Vihara:* Dinacharya (daily routine adherence), Ratricharya (sleep hygiene), Vega Dharana (suppression of natural urges), physical activity.
+- **Nidana & Samprapti:** Causative factors (dietary, behavioral, seasonal) and chronological pathogenesis indicators.
+- **Diagnosis Coding:** Dual-coded NAMASTE (National AYUSH Morbidity and Standardized Terminologies Electronic portal) + WHO ICD-11 TM2 (Traditional Medicine Module 2), confirmed by the AYUSH practitioner (§24).
 
 Adding Siddha/Unani/Homeopathy later is new protocol *data*, zero engine change — this is the literal test of whether the engine is genuinely protocol-agnostic.
 
@@ -416,37 +458,60 @@ Both interview-derived and document-derived diagnosis facts route through the id
 > - **Driver:** Eliminates cloud API latency, vendor lock-in, external billing dependencies, and enables true offline clinical kiosk deployment in remote OPDs.
 > - **Preserved Invariants:** AI Gateway remains strictly isolated (no database access, no route to PostgreSQL). All deterministic clinical logic, confidence gating, red-flag escalation, and physician review authority remain 100% unchanged `[RED LINE §10, §20]`.
 
-**100% Self-Hosted AI Pipeline Components:**
-- **VAD:** Silero VAD v5 running locally via ONNX Runtime CPU (`intra_op_num_threads=2`).
-- **ASR:** `faster-whisper-small` (CTranslate2 INT8 quantized, CPU inference, `cpu_threads=4`) supporting English, Hindi, Tamil, Telugu, and Malayalam without external API calls.
-- **Clinical NLU:** Local semantic embedding & pattern-based slot extraction (multilingual sentence representation for option mapping; no diagnosis authority).
-- **TTS:** Local synthesis engine with disk caching for high-frequency clinical questions, with graceful fallback to browser Web Speech API (`speechSynthesis`).
-- **OCR:** Local Tesseract/ONNX pipeline (async, never blocking the interactive patient loop).
+**100% Self-Hosted AI Pipeline Components & Exact Parameters:**
+- **VAD (Voice Activity Detection):**
+  - *Model:* Silero VAD v5 (`models/vad/silero_vad.onnx`) running via ONNX Runtime CPU (`intra_op_num_threads=2`).
+  - *Parameters:* Sample rate 16,000 Hz, detection threshold `0.5`, chunk size `512` samples (32ms windows), `min_speech_duration_ms=100`, `min_silence_duration_ms=300`.
+- **ASR (Automated Speech Recognition):**
+  - *Model:* `Systran/faster-whisper-small` (CTranslate2 INT8 quantized execution).
+  - *Parameters:* `device="cpu"`, `cpu_threads=4`, `beam_size=1` (greedy search for lowest latency), `condition_on_previous_text=False`, `language` dynamically set to patient selection (`en`, `hi`, `ta`, `te`, `ml`). In-memory 16kHz 16-bit mono WAV input.
+- **Clinical NLU & Multi-Slot Engine:**
+  - *Architecture:* Governed clinical synonym tables (`_SOCRATES_SYNONYMS`) covering 5 languages + code-switching ("mera chest me pain hai"), regex pattern extractors for durations/numbers, uncertainty detector (`_UNSURE_PHRASES`), and semantic embedding similarity (`sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`).
+  - *Multi-Slot Capability:* Simultaneously extracts Chief Complaint, Site, Character, Onset/Duration, Severity, Aggravating, and Relieving factors from a single utterance, submitting all matched slots in a single atomic database transaction.
+- **TTS (Text-to-Speech):**
+  - *Architecture:* Dual-layer synthesis. Layer 1: Disk-cached pre-rendered PCM16 WAV files (`models/tts_cache`) for all standard protocol prompts in 5 languages (latency < 10ms). Layer 2: On-demand local synthesis + browser Web Speech API (`window.speechSynthesis`) fallback.
+- **OCR (Optical Character Recognition):**
+  - *Model:* Tesseract / ONNX pipeline for printed prescriptions and lab reports; asynchronous execution via background worker queue.
 
 `[CONTROL]` **The privacy rule that must never be skipped:**
 All audio processing occurs entirely in-memory within the local AI Gateway worker and is purged immediately after transcription. No voice data is ever transmitted to external cloud providers.
 
+### 18.2 Ports, Browser Audio Lifecycle, & Low-Latency Execution
 
-### 18.2 Noisy-environment ASR
+| Service | Port | Role & Interaction Pattern |
+|---|---|---|
+| **Kiosk Web Application** | `:8000` (`/` or `/kiosk`) | Patient-facing touchscreen UI. Manages microphone capture via Web Audio API, encodes 16kHz WAV, plays TTS question audio, and renders interactive buttons. |
+| **Staff & Physician Frontend** | `:3200` | Physician review workspace, nurse red-flag queue, and admin management console. |
+| **AI Gateway Service** | `:8100` | Headless, isolated microservice exposing `/v1/asr/transcribe`, `/v1/nlu/slot-fill`, `/v1/nlu/extract-all`, and `/v1/tts/synthesize`. Has NO UI; direct browser navigation returns service health JSON. |
+
+**Browser Autoplay Policy & Audio Prerequisites:**
+Modern browsers (Chrome/Firefox/Safari) enforce a strict autoplay security policy: audio cannot play via `AudioContext` or `speechSynthesis` until the user interacts with the webpage (clicks or taps).
+1. When navigating to `http://localhost:8000`, the patient taps "Start Intake" or selects a language — this user gesture unlocks the `AudioContext`.
+2. Tapping the blue microphone button requests browser microphone permissions (`navigator.mediaDevices.getUserMedia`) and starts recording.
+3. Voice activity or silence threshold (rms < 0.003 for 2.5s) stops recording and dispatches the WAV payload to `/v1/sessions/{id}/answers/voice`.
+4. The response returns the next question ID and auto-triggers `speakQuestionTTS` for immediate audible response.
+
+### 18.3 Noisy-environment ASR
 
 ```
 Microphone input → Voice Activity Detection, tuned for OPD ambient noise
   → Noise suppression (applied before ASR, not after)
   → Streaming ASR — partial hypotheses emitted continuously
-  → Confidence-scored transcript → Clinical NLU
+  → Confidence-scored transcript → Clinical NLU (Multi-Slot Extraction)
   → Persistently low confidence → automatic fallback to touch/text, patient notified in-language
 ```
 Directional/noise-cancelling mic hardware is a stated kiosk procurement requirement (§8), not left implicit.
 
-### 18.3 Model boundaries
+### 18.4 Model Latency Budget (Target: <1.5s Total Turnaround)
 
-| Component | Latency class | Bound by |
+| Component | Target Latency | Optimization Strategy |
 |---|---|---|
-| ASR (streaming, VAD+noise-suppressed) | Interactive, <800ms final | Warm/preloaded worker, circuit breaker + touch/text fallback |
-| Clinical NLU (small, fast — not the large LLM) | Interactive, <200ms | Same |
-| OCR/Handwriting | Async, <2min/doc | Confidence-gated, never auto-populates below threshold |
-| LLM (summary + NAMASTE suggestion) | Bounded async, <8s | Timeout falls back to structured-facts-only view |
-| TTS | Streamed | — |
+| VAD Pre-check | < 50ms | Silero ONNX CPU int8, 512-sample chunking |
+| ASR Transcription | 300–700ms | faster-whisper-small INT8, beam_size=1, 4 threads |
+| NLU Multi-Slot Extraction | < 20ms | Governed compiled synonym hash table + regex |
+| State Recomputation & NextField | < 15ms | In-memory total ordering scan over $R(\text{state})$ |
+| TTS Audio Retrieval / Playback | < 20ms | Pre-cached disk WAV for question prompts |
+| **Total Round-Trip Time** | **< 1.2s** | **Fully local edge execution on standard hospital hardware** |
 
 ---
 

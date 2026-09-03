@@ -1321,6 +1321,9 @@
         for (let i = 0; i < pcm16.length; i++) float32[i] = pcm16[i] / 32768.0;
 
         const ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate });
+        if (ctx.state === 'suspended') {
+          ctx.resume().catch(() => {});
+        }
         const buffer = ctx.createBuffer(1, float32.length, sampleRate);
         buffer.getChannelData(0).set(float32);
 
@@ -1702,8 +1705,21 @@
       const transcriptBox = document.getElementById('transcriptBox');
       transcriptBox.style.display = 'block';
       document.getElementById('transcriptText').innerText = `"${data.transcript}"`;
-      document.getElementById('confidenceTag').innerText = `Confidence: ${(data.confidence * 100).toFixed(0)}% · Verdict: ${data.verdict}`;
-      document.getElementById('micStatus').innerText = "✅ Understood!";
+
+      const numSlots = (data.slots_extracted && data.slots_extracted.length) || 1;
+      let tagText = `Confidence: ${(data.confidence * 100).toFixed(0)}% · Verdict: ${data.verdict}`;
+      if (numSlots > 1) {
+        tagText += ` · Multi-slot (${numSlots} answers captured simultaneously)`;
+      }
+      document.getElementById('confidenceTag').innerText = tagText;
+
+      if (data.value_raw === "UNSURE") {
+        document.getElementById('micStatus').innerText = "ℹ️ Recorded as unsure/don't know — moving forward";
+      } else if (numSlots > 1) {
+        document.getElementById('micStatus').innerText = `✅ Understood! Extracted ${numSlots} clinical answers at once`;
+      } else {
+        document.getElementById('micStatus').innerText = "✅ Understood!";
+      }
 
       // If confidence verdict is confirm_back, prompt patient to confirm
       if (data.verdict === 'confirm_back') {

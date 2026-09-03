@@ -110,6 +110,67 @@ _SEVERITY_MAP = {
     "നേരിയ": 3, "മിതമായ": 5, "കഠിനമായ": 7,
 }
 
+# Explicit phrases expressing uncertainty / skipped answers
+_UNSURE_PHRASES = (
+    "don't know", "dont know", "not sure", "no idea", "cannot say", "can't say",
+    "i forgot", "don't remember", "dont remember", "unsure", "hard to say",
+    "skip", "skip question", "next question",
+    "पता नहीं", "मालूम नहीं", "याद नहीं", "नहीं पता", "नही पता", "मुझे नहीं पता",
+    "maloom nahi", "pata nahi", "yaad nahi", "nahi pata",
+    "தெரியாது", "நினைவில்லை", "தெரியல", "theriyathu", "theriyala", "ninaivillai",
+    "తెలియదు", "గుర్తులేదు", "teliyadu", "gurtuledu",
+    "അറിയില്ല", "ഓർമ്മയില്ല", "ariyilla", "ormmayilla",
+)
+
+# Governed Multilingual Clinical Synonym Table for SOCRATES Concepts
+_SOCRATES_SYNONYMS: dict[str, dict[str, tuple[str, ...]]] = {
+    "symptom_site": {
+        "chest": ("chest", "chhati", "chathi", "seena", "seene", "nenju", "gunde", "gundelo", "nenjil", "ribcage", "heart area", "sternum"),
+        "head": ("head", "forehead", "temple", "sar", "sir", "thala", "thalai", "munda", "kopam"),
+        "abdomen": ("stomach", "abdomen", "belly", "pet", "vayi", "kadupu", "vayar", "tummy", "gut", "epigastric"),
+        "back": ("back", "spine", "kamar", "peeth", "muthuku", "veepu", "spinal", "lumbar"),
+        "throat": ("throat", "gala", "gale", "thondai", "gonthu", "tonka", "pharynx"),
+        "limbs": ("arm", "leg", "hand", "foot", "haath", "pair", "kaal", "kai", "cheyi", "kaalu", "shoulder", "knee"),
+        "generalized": ("whole body", "all over", "poore shareer", "udambu muzhuvathum", "sarvaangam", "body ache"),
+    },
+    "symptom_character": {
+        "sharp": ("sharp", "stabbing", "pricking", "knife-like", "knife", "tez", "soochi", "kuriya", "chubhan", "soosi", "piercing"),
+        "dull": ("dull", "aching", "heavy ache", "halka", "mitha", "leisana", "dull ache", "heavy feeling"),
+        "crushing": ("crushing", "squeezing", "tightness", "heavy weight", "dabav", "chhati dabna", "bandh", "constricting", "heavy pressure"),
+        "burning": ("burning", "heartburn", "acid", "jalan", "erichal", "manta", "polyal", "fire"),
+        "throbbing": ("throbbing", "pulsing", "pounding", "dhadakna", "thudipu", "dhadak", "beating"),
+        "cramping": ("cramping", "cramp", "spasm", "marod", "pidippu", "thipperlu", "colicky"),
+    },
+    "symptom_radiation": {
+        "left_arm": ("left arm", "left shoulder", "baayein haath", "idathu kai", "edama cheyi", "down the arm"),
+        "jaw": ("jaw", "teeth", "chin", "jabda", "thaadai", "davaada", "neck and jaw"),
+        "back": ("back", "shoulder blades", "peeth", "muthuku", "between shoulders"),
+        "none": ("nowhere", "stays there", "kahi nahi", "engeyum illai", "ekkadiki ledu", "local", "does not spread"),
+    },
+    "symptom_exacerbating": {
+        "breathing": ("breathing", "deep breath", "coughing", "saas lene", "moochu", "swasa", "breathe", "taking a breath", "inspire"),
+        "movement": ("walking", "movement", "exertion", "stairs", "chalne", "hilne", "nadakkum", "nadisthe", "climbing", "running"),
+        "food": ("eating", "food", "after meal", "khana khane", "saapitta pin", "thinte", "spicy"),
+        "lying_down": ("lying down", "sleeping", "letne par", "padukkum", "padukunte", "flat on bed"),
+        "stress": ("stress", "tension", "worry", "chinta", "anger"),
+    },
+    "symptom_relieving": {
+        "rest": ("resting", "rest", "sitting down", "aaram", "oivu", "visranthi", "sitting still", "stopping"),
+        "medication": ("medicine", "tablet", "sorbitrate", "dawai", "marunthu", "mandhu", "antacid", "spray"),
+        "sitting_up": ("sitting up", "leaning forward", "baithne se", "utkarndhal", "bending forward"),
+    },
+    "chief_complaint": {
+        "chest_pain": ("chest pain", "pain in chest", "angina", "chhati me dard", "seene me dard", "nenju vali", "gundelo noppi"),
+        "headache": ("headache", "head pain", "migraine", "sir dard", "sar dard", "thala vali", "thalanopi", "thalavedhana"),
+        "abdominal_pain": ("stomach pain", "abdominal pain", "pet dard", "pet me dard", "vayi vali", "kadupu noppi", "vayar vedhana", "stomach ache"),
+        "shortness_of_breath": ("shortness of breath", "breathless", "breathing trouble", "saas lene me takleef", "dum ghutna", "moochu thinaral", "swasa kastam", "dyspnea"),
+        "fever": ("fever", "temperature", "bukhar", "taap", "kaichal", "jwaram", "pani", "chills"),
+        "cough": ("cough", "cold", "khasi", "irumal", "daggu", "chuma", "phlegm"),
+        "joint_pain": ("joint pain", "knee pain", "jod me dard", "mootu vali", "keelu noppi", "arthritis"),
+        "skin_rash": ("rash", "itching", "khujli", "aripu", "daddur", "skin allergy"),
+    },
+}
+
 
 class LocalNLUEngine:
     """Real NLU engine using semantic similarity for clinical slot filling.
@@ -355,12 +416,26 @@ class LocalNLUEngine:
                 unmatched_text=transcript,
             )
 
-        # If we have the embedding model, use semantic similarity
+        # 1. First check governed clinical concept synonyms (high precision, multilingual + code-switching)
+        lower = transcript.lower()
+        concept_key = (concept_code or field_id or "").lower()
+        for category, code_synonyms in _SOCRATES_SYNONYMS.items():
+            if category in concept_key or any(c in allowed_codes for c in code_synonyms):
+                for code, syns in code_synonyms.items():
+                    if code in allowed_codes and any(s in lower for s in syns):
+                        return NLUResult(
+                            codes=(code,),
+                            confidence=0.95,
+                            model_version="nlu-multilingual-synonyms",
+                            value_raw=transcript,
+                            value_normalized={"code": code},
+                        )
+
+        # 2. If we have the embedding model, use semantic similarity
         if self._model:
             return self._semantic_select(transcript, allowed_codes, multi=multi)
 
-        # Fallback: substring matching (still better than nothing)
-        lower = transcript.lower()
+        # 3. Fallback: substring matching (still better than nothing)
         matched = []
         for code in allowed_codes:
             # Check if code (or humanized version) appears in transcript
@@ -372,14 +447,14 @@ class LocalNLUEngine:
             codes = tuple(matched) if multi else (matched[0],)
             return NLUResult(
                 codes=codes,
-                confidence=0.65,
+                confidence=0.70,
                 model_version="nlu-local-v1-fallback",
             )
 
         # No match
         return NLUResult(
-            codes=(allowed_codes[0],) if allowed_codes else (),
-            confidence=0.3,
+            codes=(),
+            confidence=0.2,
             model_version="nlu-local-v1-fallback",
             unmatched_text=transcript,
         )
@@ -441,6 +516,81 @@ class LocalNLUEngine:
             model_version="nlu-local-v1",
             unmatched_text=transcript,
         )
+
+    def is_unsure(self, transcript: str) -> bool:
+        """Check if utterance indicates patient uncertainty or skipping."""
+        lower = transcript.lower().strip()
+        return any(phrase in lower for phrase in _UNSURE_PHRASES)
+
+    def extract_all_slots(self, transcript: str, language: str = "en") -> dict[str, Any]:
+        """Extract multiple SOCRATES fields simultaneously from a single utterance."""
+        lower = transcript.lower().strip()
+        if self.is_unsure(lower):
+            return {"is_unsure": True, "slots": {}}
+
+        extracted: dict[str, Any] = {}
+
+        # 1. Site
+        for code, syns in _SOCRATES_SYNONYMS["symptom_site"].items():
+            if any(s in lower for s in syns):
+                extracted["gm.hpi.site"] = {"concept": "symptom_site", "code": code, "value": code, "confidence": 0.95}
+                break
+
+        # 2. Character
+        for code, syns in _SOCRATES_SYNONYMS["symptom_character"].items():
+            if any(s in lower for s in syns):
+                extracted["gm.hpi.character"] = {"concept": "symptom_character", "code": code, "value": code, "confidence": 0.95}
+                break
+
+        # 3. Aggravating
+        for code, syns in _SOCRATES_SYNONYMS["symptom_exacerbating"].items():
+            if any(s in lower for s in syns):
+                extracted["gm.hpi.aggravating"] = {"concept": "symptom_exacerbating", "code": code, "value": code, "confidence": 0.92}
+                break
+
+        # 4. Relieving
+        for code, syns in _SOCRATES_SYNONYMS["symptom_relieving"].items():
+            if any(s in lower for s in syns):
+                extracted["gm.hpi.relieving"] = {"concept": "symptom_relieving", "code": code, "value": code, "confidence": 0.92}
+                break
+
+        # 5. Duration / Onset
+        dur_res = self._extract_duration(transcript, language)
+        if dur_res.value_normalized and dur_res.confidence >= 0.5:
+            extracted["gm.cc.duration_of_concern"] = {
+                "concept": "symptom_onset",
+                "value": dur_res.value_normalized,
+                "confidence": dur_res.confidence,
+            }
+        elif any(phrase in lower for phrase in ("this morning", "since morning", "from morning", "आज सुबह", "subah se", "kaalai", "ee roju udayam")):
+            extracted["gm.cc.duration_of_concern"] = {
+                "concept": "symptom_onset",
+                "value": {"value": 1, "unit": "days"},
+                "confidence": 0.90,
+            }
+        elif any(phrase in lower for phrase in ("since yesterday", "from yesterday", "kal se", "netru mudhal")):
+            extracted["gm.cc.duration_of_concern"] = {
+                "concept": "symptom_onset",
+                "value": {"value": 2, "unit": "days"},
+                "confidence": 0.90,
+            }
+
+        # 6. Severity (scale)
+        num_res = self._extract_numeric(transcript, language, "scale")
+        if num_res.value_normalized and num_res.confidence >= 0.7:
+            extracted["gm.hpi.severity"] = {
+                "concept": "symptom_severity",
+                "value": num_res.value_normalized["value"],
+                "confidence": num_res.confidence,
+            }
+
+        # 7. Chief complaint
+        for code, syns in _SOCRATES_SYNONYMS["chief_complaint"].items():
+            if any(s in lower for s in syns):
+                extracted["gm.cc.primary_complaint"] = {"concept": "chief_complaint", "code": code, "value": code, "confidence": 0.95}
+                break
+
+        return {"is_unsure": False, "slots": extracted}
 
     @property
     def is_loaded(self) -> bool:

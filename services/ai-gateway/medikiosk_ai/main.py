@@ -72,7 +72,20 @@ async def lifespan(app: FastAPI):
 
     settings = AIGatewaySettings()
 
-    vad_engine = SileroVADEngine(VADConfig(model_path=settings.vad_model_path))
+    repo_root = Path(__file__).resolve().parents[3]
+    vad_path = Path(settings.vad_model_path)
+    if not vad_path.is_absolute() and not vad_path.exists():
+        candidate = repo_root / settings.vad_model_path
+        if candidate.exists():
+            vad_path = candidate
+
+    tts_cache = Path(settings.tts_cache_dir)
+    if not tts_cache.is_absolute() and not tts_cache.exists():
+        candidate = repo_root / settings.tts_cache_dir
+        if candidate.parent.exists():
+            tts_cache = candidate
+
+    vad_engine = SileroVADEngine(VADConfig(model_path=str(vad_path)))
     asr_engine = LocalASREngine(
         ASRConfig(
             model_size=settings.asr_model_size,
@@ -81,11 +94,11 @@ async def lifespan(app: FastAPI):
         )
     )
     nlu_engine = LocalNLUEngine(NLUConfig())
-    tts_engine = LocalTTSEngine(TTSConfig(cache_dir=settings.tts_cache_dir))
+    tts_engine = LocalTTSEngine(TTSConfig(cache_dir=str(tts_cache)))
 
     # Pre-warm models so first user request has zero cold-start delay
     try:
-        if vad_engine and Path(settings.vad_model_path).exists():
+        if vad_engine and vad_path.exists():
             vad_engine._ensure_loaded()
         if asr_engine:
             asr_engine._ensure_loaded()
@@ -156,6 +169,23 @@ class TTSRequest(BaseModel):
 # ============================================================================
 # Health & Status
 # ============================================================================
+
+@app.get("/")
+async def root():
+    return {
+        "status": "online",
+        "service": "medikiosk-ai-gateway",
+        "version": "0.2.0",
+        "description": "MediKiosk Self-Hosted AI Gateway (ASR/VAD/NLU/TTS)",
+        "endpoints": {
+            "swagger_ui": "/docs",
+            "openapi": "/openapi.json",
+            "health": "/healthz",
+            "ready": "/readyz",
+            "models": "/v1/meta/models",
+        },
+    }
+
 
 @app.get("/healthz")
 async def health():
@@ -345,6 +375,17 @@ async def nlu_slot_fill(payload: NLUSlotFillRequest) -> dict[str, Any]:
         },
         "inference_time_ms": 12.0,
     }
+
+
+@app.post("/v1/nlu/extract-all")
+async def nlu_extract_all(request: Request) -> dict[str, Any]:
+    """Extract multiple SOCRATES clinical slots from a single utterance simultaneously."""
+    if nlu_engine is None:
+        raise HTTPException(status_code=503, detail="NLU not initialized")
+    data = await request.json()
+    transcript = data.get("transcript", "")
+    language = data.get("language", "en")
+    return nlu_engine.extract_all_slots(transcript, language)
 
 
 
