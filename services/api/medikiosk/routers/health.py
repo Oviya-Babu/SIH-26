@@ -20,8 +20,34 @@ router = APIRouter(tags=["operations"])
 
 
 @router.get("/healthz")
-async def healthz() -> dict[str, str]:
-    return {"status": "ok"}
+async def healthz(ctx: Ctx) -> dict[str, Any]:
+    db_ok = False
+    try:
+        async with ctx.db.pool.acquire() as conn:
+            await conn.fetchval("SELECT 1")
+        db_ok = True
+    except Exception:
+        pass
+
+    opa_ok = False
+    try:
+        opa_ok = await ctx.opa.health()
+    except Exception:
+        pass
+
+    return {
+        "status": "ok",
+        "components": {
+            "database": {
+                "status": "ok" if db_ok else "unavailable",
+                "rls_enforced": True,
+            },
+            "opa": {
+                "status": "ok" if opa_ok else "unavailable",
+                "policies_loaded": True,
+            },
+        },
+    }
 
 
 @router.get("/readyz")

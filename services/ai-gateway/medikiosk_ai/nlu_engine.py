@@ -255,7 +255,12 @@ class LocalNLUEngine:
             result = self._extract_duration(transcript, language)
         elif vt in ("single_select", "multi_select", "body_region") and allowed_codes:
             result = self._extract_select(
-                transcript, language, allowed_codes, multi=(vt != "single_select")
+                transcript,
+                language,
+                allowed_codes,
+                field_id=field_id,
+                concept_code=concept_code,
+                multi=(vt != "single_select"),
             )
         elif vt == "text":
             result = NLUResult(
@@ -268,7 +273,14 @@ class LocalNLUEngine:
         else:
             # Default: try select if codes available, else free text
             if allowed_codes:
-                result = self._extract_select(transcript, language, allowed_codes, multi=False)
+                result = self._extract_select(
+                    transcript,
+                    language,
+                    allowed_codes,
+                    field_id=field_id,
+                    concept_code=concept_code,
+                    multi=False,
+                )
             else:
                 result = NLUResult(
                     codes=(),
@@ -407,6 +419,8 @@ class LocalNLUEngine:
         language: str,
         allowed_codes: list[str],
         *,
+        field_id: str | None = None,
+        concept_code: str | None = None,
         multi: bool = False,
     ) -> NLUResult:
         """Extract option codes using semantic similarity."""

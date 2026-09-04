@@ -11,6 +11,7 @@ service outage is an outage, not an access grant.
 
 from __future__ import annotations
 
+from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Any
 from uuid import UUID
@@ -32,23 +33,26 @@ class ResourceContext:
     tenant_id: UUID | None = None
     department_id: UUID | None = None
     patient_id: UUID | None = None
+    session_id: UUID | None = None
     status: str | None = None
     extra: dict[str, Any] = field(default_factory=dict)
 
     def to_input(self) -> dict[str, Any]:
-        payload: dict[str, Any] = {"type": self.type}
+        doc: dict[str, Any] = {"type": self.type}
         if self.id is not None:
-            payload["id"] = str(self.id)
+            doc["id"] = str(self.id)
         if self.tenant_id is not None:
-            payload["tenant_id"] = str(self.tenant_id)
+            doc["tenant_id"] = str(self.tenant_id)
         if self.department_id is not None:
-            payload["department_id"] = str(self.department_id)
+            doc["department_id"] = str(self.department_id)
         if self.patient_id is not None:
-            payload["patient_id"] = str(self.patient_id)
+            doc["patient_id"] = str(self.patient_id)
+        if self.session_id is not None:
+            doc["session_id"] = str(self.session_id)
         if self.status is not None:
-            payload["status"] = self.status
-        payload.update(self.extra)
-        return payload
+            doc["status"] = self.status
+        doc.update(self.extra)
+        return doc
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,6 +69,35 @@ class OPAClient:
             f"{settings.opa_url.rstrip('/')}/v1/data/"
             f"{settings.opa_decision_path.strip('/')}"
         )
+
+    async def ensure_policies(self) -> bool:
+        """Ensure authz.rego is actively loaded into OPA. If missing, auto-upload via REST API."""
+        policy_path = Path(__file__).resolve().parents[4] / "policies" / "opa" / "authz.rego"
+        if not policy_path.is_file():
+            return False
+        try:
+            resp = await self._client.get(
+                f"{self._settings.opa_url.rstrip('/')}/v1/policies",
+                timeout=self._settings.opa_timeout_seconds,
+            )
+            if resp.status_code == 200:
+                policies = resp.json().get("result", [])
+                if any(p.get("id") == "authz" or "authz.rego" in p.get("id", "") for p in policies):
+                    return True
+            # Policy missing in OPA: upload and compile it
+            policy_text = policy_path.read_text(encoding="utf-8")
+            put_resp = await self._client.put(
+                f"{self._settings.opa_url.rstrip('/')}/v1/policies/authz",
+                content=policy_text,
+                headers={"Content-Type": "text/plain"},
+                timeout=self._settings.opa_timeout_seconds,
+            )
+            if put_resp.status_code == 200:
+                log.info("opa_policy_synced", policy_id="authz")
+                return True
+        except Exception as exc:
+            log.warning("opa_policy_sync_failed", error=str(exc))
+        return False
 
     async def evaluate(self, opa_input: dict[str, Any]) -> Decision:
         try:
@@ -94,6 +127,26 @@ class OPAClient:
 
         body = resp.json()
         if "result" not in body:
+            # If OPA returned undefined because policies were dropped/restarted, auto-sync and retry once
+            synced = await self.ensure_policies()
+            if synced:
+                try:
+                    retry_resp = await self._client.post(
+                        self._url,
+                        json={"input": opa_input},
+                        timeout=self._settings.opa_timeout_seconds,
+                    )
+                    if retry_resp.status_code == 200:
+                        retry_body = retry_resp.json()
+                        if "result" in retry_body:
+                            res = retry_body["result"]
+                            allow = res is True or (isinstance(res, dict) and res.get("allow") is True)
+                            return Decision(
+                                allow=bool(allow),
+                                reason_code="opa_allow" if allow else "opa_deny",
+                            )
+                except Exception:
+                    pass
             # An undefined decision is a deny: the policy did not say yes.
             return Decision(allow=False, reason_code="opa_undefined")
 
@@ -110,9 +163,13 @@ class OPAClient:
                 f"{self._settings.opa_url.rstrip('/')}/health",
                 timeout=self._settings.opa_timeout_seconds,
             )
+            if resp.status_code != 200:
+                return False
+            # Ensure policies are compiled and ready
+            await self.ensure_policies()
+            return True
         except httpx.HTTPError:
             return False
-        return resp.status_code == 200
 
 
 def build_input(

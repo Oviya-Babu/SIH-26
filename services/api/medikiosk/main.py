@@ -47,6 +47,10 @@ async def lifespan(app: FastAPI):
     ctx = await AppContext.create(settings, connect_db=app.state.connect_db)
     app.state.ctx = ctx
     try:
+        await ctx.opa.ensure_policies()
+    except Exception as exc:
+        log.warning("opa_policy_sync_failed", error=str(exc))
+    try:
         yield
     finally:
         await ctx.aclose()
